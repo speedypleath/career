@@ -114,21 +114,42 @@ export async function scanEmails(): Promise<ScanResult> {
     // 3. Try scanning via gog CLI if available
     let gogMessages: Array<{ id: string; subject: string; sender: string; snippet: string; date: string }> = []
     
+    const gogAccount = settings?.gmail_account || "gheorgheandrei13@gmail.com"
     try {
-      const gogAccount = settings?.gmail_account || "gheorgheandrei13@gmail.com"
-      const { stdout } = await execAsync(
-        `gog gmail messages search "newer_than:7d (job OR interview OR application OR 'thank you' OR rejection OR offer)" --max 25 --account ${gogAccount} --format json 2>/dev/null || gog gmail search "newer_than:7d" --max 20 --account ${gogAccount} 2>/dev/null || true`
+      const { stdout, stderr } = await execAsync(
+        `gog gmail search "newer_than:14d (job OR interview OR application OR 'thank you' OR rejection OR offer)" --json --results-only --account ${gogAccount} --max 25`
       )
-      
-      if (stdout && stdout.trim().startsWith("[")) {
-        gogMessages = JSON.parse(stdout)
+
+      const trimmed = (stdout || "").trim()
+      if (trimmed.startsWith("[")) {
+        gogMessages = JSON.parse(trimmed)
+      } else if (trimmed.startsWith("{")) {
+        // Some gog versions wrap results in an object
+        const parsed = JSON.parse(trimmed)
+        gogMessages = parsed.messages || parsed.results || parsed.threads || []
+      } else if (trimmed) {
+        result.errors.push(`Gmail scan returned unexpected output: ${trimmed.slice(0, 200)}`)
+      } else if (stderr && stderr.trim()) {
+        result.errors.push(`Gmail scan: ${stderr.trim().slice(0, 300)}`)
       }
-    } catch {
-      // gog might require reauth or not output json, continue with fallback
+    } catch (err) {
+      // Surface the failure instead of silently reporting "0 new emails".
+      const raw = err instanceof Error
+        ? `${err.message}${(err as { stderr?: string }).stderr ?? ""}`
+        : String(err)
+
+      if (/invalid_grant|expired or revoked|token/i.test(raw)) {
+        result.errors.push(
+          `Gmail access expired for ${gogAccount}. Re-authorize with: gog auth manage login`
+        )
+      } else if (/not found|command not found|ENOENT/i.test(raw)) {
+        result.errors.push(`The 'gog' CLI is not available on PATH — Gmail scanning is disabled.`)
+      } else {
+        result.errors.push(`Gmail scan failed: ${raw.slice(0, 300)}`)
+      }
     }
 
-    // 4. Also check for local simulation / test ingest or recent email files
-    // Let's process any discovered messages or mock/simulated incoming signals
+    // 4. Process discovered messages
     for (const msg of gogMessages) {
       result.scannedCount++
       const messageId = msg.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -148,10 +169,12 @@ export async function scanEmails(): Promise<ScanResult> {
         const bodyLower = snippet.toLowerCase()
 
         if (
-          senderLower.includes(compLower) ||
-          subjectLower.includes(compLower) ||
-          bodyLower.includes(compLower) ||
-          (app.contact_email && senderLower.includes(app.contact_email.toLowerCase()))
+          compLower.length > 2 && (
+            senderLower.includes(compLower) ||
+            subjectLower.includes(compLower) ||
+            bodyLower.includes(compLower) ||
+            (app.contact_email && senderLower.includes(app.contact_email.toLowerCase()))
+          )
         ) {
           matchedAppId = app.id
           break
@@ -161,6 +184,42 @@ export async function scanEmails(): Promise<ScanResult> {
       // Check if already in email_logs
       const existing = await query(`SELECT id FROM email_logs WHERE message_id = $1`, [messageId])
       if (existing.rows.length === 0) {
+        // If not matched to existing app, auto-create app if confirmation/interview email
+        if (!matchedAppId && (classification === "confirmation" || classification === "interview" || classification === "offer")) {
+          // Extract probable company name from subject or sender
+          let companyName = "Unknown Company"
+          if (subject.includes(" at ")) {
+            companyName = subject.split(" at ")[1].split(/[-–|!\.]/)[0].trim()
+          } else if (subject.includes(" - ")) {
+            companyName = subject.split(" - ")[0].trim()
+          } else if (sender.includes("<")) {
+            const domain = sender.split("@")[1]?.split(">")[0]
+            if (domain) companyName = domain.split(".")[0].toUpperCase()
+          }
+
+          let jobTitle = "Software Engineer"
+          if (subject.includes("for ")) {
+            const extracted = subject.split("for ")[1].split(/ at | - |!|\./)[0].trim()
+            if (extracted.length > 3 && extracted.length < 50) jobTitle = extracted
+          }
+
+          const newAppRes = await query<Application>(
+            `INSERT INTO applications (title, company, workplace_type, status, application_method, contact_email, notes, priority, source, applied_at, created_at, updated_at)
+             VALUES ($1, $2, 'remote', 'applied', 'email', $3, $4, 'medium', 'email_scanner', NOW(), NOW(), NOW())
+             RETURNING *`,
+            [jobTitle, companyName, sender, `Auto-detected from email: "${subject}"`]
+          )
+          const newApp = newAppRes.rows[0]
+          matchedAppId = newApp.id
+          applications.push(newApp)
+
+          await query(
+            `INSERT INTO application_events (application_id, event_type, title, description)
+             VALUES ($1, 'email_created', 'Application Auto-Detected', $2)`,
+            [matchedAppId, `Created application from email: "${subject}"`]
+          )
+        }
+
         const logRes = await query<EmailLog>(
           `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, received_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())

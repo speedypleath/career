@@ -21,6 +21,7 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [scanNotice, setScanNotice] = useState<string | null>(null)
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -32,8 +33,8 @@ export default function Home() {
     setError(null)
     try {
       const [appsRes, statsRes] = await Promise.all([
-        fetch("/api/applications"),
-        fetch("/api/stats"),
+        fetch("/api/applications", { cache: "no-store" }),
+        fetch("/api/stats", { cache: "no-store" }),
       ])
 
       if (!appsRes.ok || !statsRes.ok) {
@@ -56,6 +57,22 @@ export default function Home() {
 
   useEffect(() => {
     loadData()
+
+    // Poll every 15 seconds for incoming webhooks or automated applications
+    const interval = setInterval(() => {
+      loadData(true)
+    }, 15000)
+
+    // Re-fetch on window focus
+    const handleFocus = () => {
+      loadData(true)
+    }
+    window.addEventListener("focus", handleFocus)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [loadData])
 
   async function handleUpdateStatus(id: string, newStatus: ApplicationStatus) {
@@ -75,13 +92,30 @@ export default function Home() {
 
   async function handleScanEmails() {
     setIsScanning(true)
+    setError(null)
+    setScanNotice(null)
     try {
-      const res = await fetch("/api/email/scan")
-      if (res.ok) {
-        await loadData(true)
+      const res = await fetch("/api/email/scan", { cache: "no-store" })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Gmail scan failed (HTTP ${res.status})`)
       }
+
+      // The scanner collects non-fatal problems (expired OAuth, missing CLI)
+      // in `errors` — show them instead of silently reporting "0 new".
+      if (data?.errors?.length) {
+        setError(data.errors.join(" · "))
+      } else {
+        setScanNotice(
+          `Gmail scan complete — scanned ${data?.scannedCount ?? 0}, matched ${data?.matchedCount ?? 0}, ${data?.newEmails?.length ?? 0} new.`
+        )
+      }
+
+      await loadData(true)
     } catch (err) {
       console.error("Email scan failed:", err)
+      setError(err instanceof Error ? err.message : "Email scan failed")
     } finally {
       setIsScanning(false)
     }
@@ -104,6 +138,22 @@ export default function Home() {
       <main className="flex-1 overflow-y-auto p-6 md:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
           {error && <ErrorBanner message={error} retry={() => loadData(false)} />}
+
+          {scanNotice && (
+            <div
+              role="status"
+              className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-300"
+            >
+              <span>{scanNotice}</span>
+              <button
+                onClick={() => setScanNotice(null)}
+                aria-label="Dismiss scan result"
+                className="rounded px-2 py-0.5 text-xs text-emerald-400/80 hover:bg-emerald-500/15 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {activeTab === "overview" && (
             <OverviewView
