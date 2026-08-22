@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens — "operator console": near-black chassis, hairline rules,
+   a single desaturated teal reserved for state that matters (active nav,
+   healthy services, primary emphasis). Everything else is monochrome so the
+   numbers and data carry the page.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-bg: #0b0c0f;
+  --color-rail: #0d0e12;
+  --color-surface: #15161b;
+  --color-surface-hi: #1a1c22;
+  --color-line: #24262d;
+  --color-line-soft: #1b1d23;
+  --color-fg: #e8e8ec;
+  --color-muted: #9a9ba3;
+  --color-faint: #6f7179;
+  --color-accent: #2dd4a7;
+  --color-accent-dim: #1d7f66;
+  --color-danger: #f87171;
+  --color-warn: #fbbf24;
+  --color-info: #38bdf8;
+  --color-purple: #c084fc;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --radius-panel: 10px;
+
+  --ease-meter: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-bg);
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv05" 1;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 30%, transparent);
+    color: var(--color-fg);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+}
+
+@layer utilities {
+  .label {
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+
+  .meter-fill {
+    transition: width 600ms var(--ease-meter);
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-line-soft) 0%,
+      var(--color-line) 40%,
+      var(--color-line-soft) 80%
+    );
+    background-size: 300% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
