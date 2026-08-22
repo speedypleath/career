@@ -45,21 +45,38 @@ export function ApplicationsView({
   const [sortBy, setSortBy] = useState<"recent" | "company" | "priority" | "status">("recent")
 
   // Filtered and sorted applications
-  const filtered = applications.filter((app) => {
-    const matchesSearch =
-      search === "" ||
-      app.title.toLowerCase().includes(search.toLowerCase()) ||
-      app.company.toLowerCase().includes(search.toLowerCase()) ||
-      app.location.toLowerCase().includes(search.toLowerCase()) ||
-      app.notes.toLowerCase().includes(search.toLowerCase()) ||
-      app.job_description.toLowerCase().includes(search.toLowerCase())
+  const filtered = applications
+    .filter((app) => {
+      const matchesSearch =
+        search === "" ||
+        app.title.toLowerCase().includes(search.toLowerCase()) ||
+        app.company.toLowerCase().includes(search.toLowerCase()) ||
+        app.location.toLowerCase().includes(search.toLowerCase()) ||
+        app.notes.toLowerCase().includes(search.toLowerCase()) ||
+        app.job_description.toLowerCase().includes(search.toLowerCase())
 
-    const matchesStatus = statusFilter === "all" || app.status === statusFilter
-    const matchesWorkplace = workplaceFilter === "all" || app.workplace_type === workplaceFilter
-    const matchesMethod = methodFilter === "all" || app.application_method === methodFilter
+      const matchesStatus = statusFilter === "all" || app.status === statusFilter
+      const matchesWorkplace = workplaceFilter === "all" || app.workplace_type === workplaceFilter
+      const matchesMethod = methodFilter === "all" || app.application_method === methodFilter
 
-    return matchesSearch && matchesStatus && matchesWorkplace && matchesMethod
-  })
+      return matchesSearch && matchesStatus && matchesWorkplace && matchesMethod
+    })
+    .sort((a, b) => {
+      if (sortBy === "company") {
+        return a.company.localeCompare(b.company)
+      }
+      if (sortBy === "status") {
+        return a.status.localeCompare(b.status)
+      }
+      if (sortBy === "priority") {
+        const order: Record<string, number> = { top: 1, high: 2, medium: 3, low: 4 }
+        return (order[a.priority] || 5) - (order[b.priority] || 5)
+      }
+      // "recent" default: sort by applied_at or created_at descending
+      const dateA = new Date(a.applied_at || a.created_at).getTime()
+      const dateB = new Date(b.applied_at || b.created_at).getTime()
+      return dateB - dateA
+    })
 
   return (
     <div className="space-y-4">
