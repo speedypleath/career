@@ -112,7 +112,16 @@ export async function scanEmails(): Promise<ScanResult> {
     const settings = settingsRes.rows[0]
 
     // 3. Try scanning via gog CLI if available
-    let gogMessages: Array<{ id: string; subject: string; sender: string; snippet: string; date: string }> = []
+    // gog's search output uses `from` (not `sender`) and carries no body at all,
+    // so the body is fetched per-message below via `gog gmail get`.
+    let gogMessages: Array<{
+      id: string
+      subject?: string
+      from?: string
+      sender?: string
+      snippet?: string
+      date?: string
+    }> = []
     
     const gogAccount = settings?.gmail_account || "owner@example.com"
     try {
@@ -149,14 +158,56 @@ export async function scanEmails(): Promise<ScanResult> {
       }
     }
 
+    // 3b. Hydrate message bodies. `gog gmail search` returns only id/subject/from/date,
+    // so classifying on the subject alone marks nearly everything "unrelated".
+    // Fetch each body with `gog gmail get`, with bounded concurrency.
+    const bodies = new Map<string, string>()
+    if (gogMessages.length > 0) {
+      const CONCURRENCY = 5
+      const queue = [...gogMessages]
+
+      const worker = async () => {
+        for (;;) {
+          const msg = queue.shift()
+          if (!msg?.id) return
+          try {
+            const { stdout } = await execAsync(
+              `gog gmail get ${msg.id} --account ${gogAccount} --json --results-only`,
+              { maxBuffer: 4 * 1024 * 1024 }
+            )
+            const trimmed = (stdout || "").trim()
+            if (!trimmed.startsWith("{")) continue
+            const parsed = JSON.parse(trimmed) as { body?: string }
+            if (typeof parsed.body === "string") {
+              // Strip the quoted-printable line breaks and cap the size we classify on.
+              bodies.set(msg.id, parsed.body.replace(/\r\n/g, "\n").slice(0, 8000))
+            }
+          } catch {
+            // A single unreadable message must not abort the whole scan.
+          }
+        }
+      }
+
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, gogMessages.length) }, worker)
+      )
+
+      if (bodies.size === 0) {
+        result.errors.push(
+          `Fetched ${gogMessages.length} message headers but could not read any bodies — classification will be unreliable.`
+        )
+      }
+    }
+
     // 4. Process discovered messages
     for (const msg of gogMessages) {
       result.scannedCount++
       const messageId = msg.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-      const sender = msg.sender || ""
+      const sender = msg.from || msg.sender || ""
       const subject = msg.subject || ""
-      const snippet = msg.snippet || ""
-      const classification = classifyEmail(subject, snippet)
+      const body = bodies.get(msg.id) || msg.snippet || ""
+      const snippet = body.slice(0, 300)
+      const classification = classifyEmail(subject, body)
 
       if (classification === "unrelated") continue
 
@@ -224,7 +275,7 @@ export async function scanEmails(): Promise<ScanResult> {
           `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, received_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
            RETURNING *`,
-          [matchedAppId, messageId, sender, settings?.gmail_account || "", subject, snippet, snippet, classification]
+          [matchedAppId, messageId, sender, settings?.gmail_account || "", subject, snippet, body, classification]
         )
 
         const logged = logRes.rows[0]
