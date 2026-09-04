@@ -42,10 +42,14 @@ CREATE TABLE IF NOT EXISTS email_logs (
   subject TEXT DEFAULT '',
   snippet TEXT DEFAULT '',
   body TEXT DEFAULT '',
-  classification TEXT DEFAULT 'unrelated', -- 'confirmation', 'interview', 'rejection', 'question', 'offer', 'unrelated'
+  classification TEXT DEFAULT 'unrelated', -- 'confirmation', 'interview', 'assessment', 'rejection', 'question', 'offer', 'unrelated'
+  -- Set when a human corrects the classification in the UI. Rescans leave these rows alone.
+  manual_override BOOLEAN DEFAULT FALSE,
   received_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS manual_override BOOLEAN DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS email_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',

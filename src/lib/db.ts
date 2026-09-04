@@ -1,4 +1,4 @@
-import { Pool, QueryResultRow } from "pg"
+import { Pool, type QueryResultRow } from "pg"
 
 const pool = new Pool({
   host: process.env.PGHOST ?? "127.0.0.1",

@@ -45,12 +45,18 @@ export function KanbanView({
   onOpenAddModal,
   onUpdateStatus,
 }: KanbanViewProps) {
+  const [selectedMobileCol, setSelectedMobileCol] = useState<ApplicationStatus | "all">("all")
+
+  const displayedColumns = selectedMobileCol === "all"
+    ? COLUMNS
+    : COLUMNS.filter((c) => c.id === selectedMobileCol)
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold tracking-tight text-[var(--color-fg)]">
+          <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--color-fg)]">
             Application Pipeline Board
           </h1>
           <p className="text-xs text-[var(--color-muted)]">
@@ -60,23 +66,57 @@ export function KanbanView({
 
         <button
           onClick={onOpenAddModal}
-          className="flex items-center gap-1.5 rounded-[var(--radius-panel)] bg-[var(--color-accent)] px-3.5 py-1.5 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 transition-all"
+          className="flex items-center gap-1.5 rounded-[var(--radius-panel)] bg-[var(--color-accent)] px-3.5 py-1.5 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 transition-all cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5" />
           Track Application
         </button>
       </div>
 
-      {/* Kanban Board Horizontal Scroll */}
-      <div className="flex gap-4 overflow-x-auto pb-4 pt-1 min-h-[calc(100vh-220px)]">
+      {/* Mobile Column Quick Filter Selector Tabs (md:hidden) */}
+      <div className="flex md:hidden gap-1.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+        <button
+          onClick={() => setSelectedMobileCol("all")}
+          className={cx(
+            "rounded-full px-3 py-1 text-[11px] font-medium shrink-0 border transition-colors",
+            selectedMobileCol === "all"
+              ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
+              : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]"
+          )}
+        >
+          All Stages ({applications.length})
+        </button>
         {COLUMNS.map((col) => {
+          const count = applications.filter((a) => a.status === col.id).length
+          const isSelected = selectedMobileCol === col.id
+          return (
+            <button
+              key={col.id}
+              onClick={() => setSelectedMobileCol(col.id)}
+              className={cx(
+                "rounded-full px-3 py-1 text-[11px] font-medium shrink-0 border transition-colors flex items-center gap-1.5",
+                isSelected
+                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
+                  : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]"
+              )}
+            >
+              <span>{col.title.split("/")[0].trim()}</span>
+              <span className="tnum text-[10px] opacity-80">({count})</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Kanban Board Horizontal Scroll Container */}
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 pt-1 min-h-[calc(100vh-250px)] snap-x">
+        {displayedColumns.map((col) => {
           const colApps = applications.filter((a) => a.status === col.id)
 
           return (
             <div
               key={col.id}
               className={cx(
-                "flex w-80 shrink-0 flex-col rounded-[var(--radius-panel)] border bg-[var(--color-rail)] p-3 space-y-3",
+                "flex w-[82vw] sm:w-80 shrink-0 flex-col rounded-[var(--radius-panel)] border bg-[var(--color-rail)] p-3 space-y-3 snap-start",
                 col.color
               )}
             >

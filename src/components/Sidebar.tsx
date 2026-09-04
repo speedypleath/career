@@ -10,7 +10,8 @@ import {
   Plus,
   Compass,
   Terminal,
-  RefreshCw
+  RefreshCw,
+  X
 } from "lucide-react"
 import { StatusDot } from "./StatusDot"
 import { cx } from "./format"
@@ -24,6 +25,8 @@ interface SidebarProps {
   emailCount?: number
   onRefreshAll?: () => void
   isRefreshing?: boolean
+  isMobileOpen?: boolean
+  onCloseMobile?: () => void
 }
 
 export function Sidebar({
@@ -34,6 +37,8 @@ export function Sidebar({
   emailCount = 0,
   onRefreshAll,
   isRefreshing = false,
+  isMobileOpen = false,
+  onCloseMobile,
 }: SidebarProps) {
   const navItems: { id: TabId; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -44,12 +49,12 @@ export function Sidebar({
     { id: "settings", label: "Settings", icon: Settings },
   ]
 
-  return (
-    <aside className="flex h-screen w-64 flex-col justify-between border-r border-[var(--color-line)] bg-[var(--color-rail)] p-4 select-none">
+  const content = (
+    <div className="flex h-full flex-col justify-between p-4 select-none">
       {/* Top Section */}
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Brand Header */}
-        <div className="flex items-center justify-between px-2 pt-1">
+        <div className="flex items-center justify-between px-1 pt-1">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--color-accent)]/30 bg-[var(--color-surface)] text-[var(--color-accent)] font-bold">
               <Compass className="h-4 w-4" />
@@ -63,22 +68,37 @@ export function Sidebar({
             </div>
           </div>
 
-          <button
-            onClick={onRefreshAll}
-            title="Refresh data"
-            className={cx(
-              "rounded p-1.5 text-[var(--color-faint)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg)] transition-colors",
-              isRefreshing && "animate-spin text-[var(--color-accent)]"
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onRefreshAll}
+              title="Refresh data"
+              className={cx(
+                "rounded p-1.5 text-[var(--color-faint)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg)] transition-colors",
+                isRefreshing && "animate-spin text-[var(--color-accent)]"
+              )}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+
+            {onCloseMobile && (
+              <button
+                onClick={onCloseMobile}
+                title="Close menu"
+                className="md:hidden rounded p-1.5 text-[var(--color-faint)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
+          </div>
         </div>
 
         {/* Quick Action Button */}
         <button
-          onClick={onOpenAddModal}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-panel)] bg-[var(--color-accent)] py-2 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 active:scale-[0.99] transition-all"
+          onClick={() => {
+            onOpenAddModal()
+            if (onCloseMobile) onCloseMobile()
+          }}
+          className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-panel)] bg-[var(--color-accent)] py-2 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 active:scale-[0.99] transition-all cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5" />
           Track Application
@@ -94,9 +114,12 @@ export function Sidebar({
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id)
+                  if (onCloseMobile) onCloseMobile()
+                }}
                 className={cx(
-                  "flex w-full items-center justify-between rounded-[var(--radius-panel)] px-3 py-2 text-xs font-medium transition-colors",
+                  "flex w-full items-center justify-between rounded-[var(--radius-panel)] px-3 py-2 text-xs font-medium transition-colors cursor-pointer",
                   active
                     ? "bg-[var(--color-surface)] text-[var(--color-accent)] border border-[var(--color-line)] shadow-inner"
                     : "text-[var(--color-muted)] hover:bg-[var(--color-surface)]/60 hover:text-[var(--color-fg)]"
@@ -141,6 +164,30 @@ export function Sidebar({
           <span className="tnum">:8098</span>
         </div>
       </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Desktop Sidebar (Fixed Left Rail) */}
+      <aside className="hidden md:flex h-screen w-64 flex-col border-r border-[var(--color-line)] bg-[var(--color-rail)]">
+        {content}
+      </aside>
+
+      {/* Mobile Drawer (Slide Over with Backdrop) */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
+            onClick={onCloseMobile}
+          />
+          {/* Slide-out Panel */}
+          <div className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col border-r border-[var(--color-line)] bg-[var(--color-rail)] shadow-2xl animate-in slide-in-from-left duration-200">
+            {content}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
