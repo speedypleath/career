@@ -1,139 +1,75 @@
-# Email response classifier
+# Email classifier architecture
 
-`src/lib/email-classifier.ts` decides what a piece of mail means for a job
-application. It replaced an ordered chain of `includes()` checks that got a lot
-of mail wrong in three predictable ways:
+The classifier uses a minimal-token asynchronous cascade:
 
-1. A keyword anywhere in the message won, including inside boilerplate —
-   *"all official communication comes from @goodtime.io"* was read as an
-   **interview**.
-2. Descriptions of a *future* process read as invitations —
-   *"Next steps: Recruitment Screening Call — a Zoom call…"* was read as an
-   **interview** rather than an acknowledgement.
-3. Newsletters and job-board digests matched job vocabulary — *"I accepted the
-   job offer"* inside a Glassdoor community digest was read as an **offer**.
+1. The Next.js scanner normalizes each email and applies deterministic noise and explicit-outcome rules.
+2. Obvious decisions complete immediately with zero model tokens.
+3. Only ambiguous messages are saved as `pending` and sent to the private Supabase `pgmq` queue.
+4. The `email-classifier-worker` Edge Function consumes five jobs at a time and checks the 30-day prompt-hash cache.
+5. Cache misses call Cloudflare Workers AI using `@cf/meta/llama-3.2-1b-instruct`.
+6. The worker finalizes `email_logs`, links or creates the application, advances its status when appropriate, and deletes the queue message.
+7. Failed messages become visible after 60 seconds. After three failed deliveries they are marked `failed` and archived.
 
-The replacement scores evidence rather than taking the first match.
+The queue insert wakes the Edge Function through `pg_net`. Supabase Cron also invokes it once per minute so a missed wake-up cannot strand work.
 
-## Categories
+## Token and request budgets
 
-| Category | Meaning | Application status it sets |
-| --- | --- | --- |
-| `offer` | An offer was extended | `offer` |
-| `rejection` | Explicitly not moving forward | `rejected` |
-| `interview` | A concrete invitation or booking | `interviewing` |
-| `assessment` | A test, take-home or one-way video to complete | `technical_assessment` |
-| `question` | Recruiter is asking the candidate something | *(no change)* |
-| `confirmation` | Application received / acknowledged | `applied` |
-| `unrelated` | Not about this job search | *(no change)* |
+- Maximum estimated input: 1,100 tokens, including the system prompt.
+- Maximum output: 3 tokens; only a single digit from `0` through `6` is accepted.
+- Maximum queued classifications per Gmail scan: 12 by default.
+- The queue payload contains the bounded prompt and operational metadata, never the full email body.
+- Repeated bounded prompts use the database cache and consume no Cloudflare tokens.
 
-That order is also the resolution priority: on a tie, the more consequential
-category wins.
+`EMAIL_CLASSIFIER_MAX_CALLS_PER_SCAN` can lower or raise the per-scan queue ceiling. Set it to `0` to keep deterministic classification while disabling new model jobs.
 
-## Pipeline
+## Required Supabase configuration
 
-```
-normalise → sender/shape gates → score rules → suppress by context
-          → structural adjustments → resolve → corroboration gate
-```
+Apply `supabase/migrations/202609040001_email_classification_queue.sql`, then configure:
 
-### 1. Normalise
+### Edge Function secrets
 
-Strips HTML, decodes entities, removes quoted replies and signature footers,
-collapses whitespace, and pulls every URL out into a `links[]` array — replacing
-each with a `LINK` sentinel so link *position* still counts as a
-signal while the URL text cannot pollute keyword matching.
+- `CLOUDFLARE_API_TOKEN` — Cloudflare API token restricted to Workers AI Read.
+- `CLOUDFLARE_ACCOUNT_ID` — account used in the Workers AI endpoint.
 
-Links are kept because some senders only state the outcome in a tracking URL.
-LinkedIn, for instance, says nothing in the body but links
-`jobs_application_rejected`.
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are supplied automatically by the hosted Edge Function runtime.
 
-### 2. Gates (early `unrelated` returns)
+### Vault entries
 
-| Gate | Rejects |
-| --- | --- |
-| Noise sender | Domains that only ever send digests or marketing |
-| Bulk-mail shape | Digest/newsletter/transactional subject and body patterns |
-| Non-job application | Conference posters, papers, grants — they use *"your application"* in exactly the same words a job does |
+The immediate wake-up and Cron recovery function read these Supabase Vault entries:
 
-All three are overridden by explicit personal application context or a LinkedIn
-rejection tag, so a real reply is never silently dropped.
+- `project_url` — the project URL, such as `https://<project-ref>.supabase.co`.
+- `anon_key` — the project publishable/anonymous key used by the database to invoke the JWT-protected Edge Function.
 
-### 3. Rules and context suppression
+No credential belongs in source, migrations, logs, or client bundles.
 
-Each rule is a weighted regex with a scope (`subject`, `body` or both). A match
-is scored against **its own sentence**, not the whole message, and then damped
-when that sentence is not asserting anything:
+## Deployment
 
-| Context | Multiplier |
-| --- | --- |
-| Hypothetical (*"if you are selected…"*) | ×0.15 |
-| Future process (*"the next stage will be…"*) | ×0.25 |
-| Inside a "what happens next" section | ×0.2 |
-
-A genuine invitation survives the process-section damping because it carries a
-booking link.
-
-Rejection boilerplate is removed before rejection rules run, which is what stops
-*"we will keep your CV on file should another role…"* from reading as a
-rejection on its own.
-
-### 4. Structural adjustments
-
-- **Interviews need a hook.** Warm language alone is ×0.45; a real one has a
-  calendar invite, a booking link, an availability request or an explicit
-  invitation.
-- **Assessments need a hook.** A known assessment platform, a link, or an
-  explicit instruction to complete something — otherwise ×0.5.
-- **Echoed application forms don't ask questions.** ATS acknowledgements that
-  quote the submitted form back get `question` and `assessment` ×0.2.
-- **A weak "unfortunately" doesn't beat a clear acknowledgement** (×0.4), and a
-  real rejection outranks the acknowledgement it is bundled with (×0.35 on
-  `confirmation`).
-
-### 5. Resolve and corroborate
-
-The winner must clear `MIN_SCORE = 4`. Then, if nothing has established that
-this message is even about the recipient's job search — no ATS sender, no
-personal application context, no job title in the subject — it must be backed by
-a **strong signal or two independent ones**. Otherwise it falls back to
-`unrelated`.
-
-This gate exists because ordinary mail borrows the vocabulary constantly. A bank
-fraud notice says *"unfortunately"*; a Google Forms receipt echoes *"please
-provide"*. One weak hint is a coincidence, not a verdict.
-
-Confidence is derived from the margin over the runner-up plus the absolute
-score, clamped to `[0.35, 0.99]`.
-
-## Manual overrides
-
-Correcting a classification in the UI sets `email_logs.manual_override = true`.
-Both the scanner and the eval harness skip those rows, so a correction survives
-every future rescan.
-
-## Changing the rules
-
-`scripts/eval-classifier.ts` re-runs the current engine over every stored email
-and diffs against what is saved, so a change is measured against a real corpus
-instead of a hand-picked example.
+Use a pinned Supabase CLI version:
 
 ```bash
-node scripts/eval-classifier.ts                 # transition matrix + every change
-node scripts/eval-classifier.ts --only interview
-node scripts/eval-classifier.ts --reasons       # which rules fired, and at what weight
-node scripts/eval-classifier.ts --write         # persist, skipping manual_override rows
+npx supabase@latest link --project-ref <project-ref>
+npx supabase@latest db push
+npx supabase@latest functions deploy email-classifier-worker
 ```
 
-The workflow that works:
+Set Edge Function secrets through the Supabase Dashboard or a protected credential-injection workflow. Do not pass credentials as command-line arguments.
 
-1. Run it before the change and confirm it reports **0 changed** — that is the
-   baseline.
-2. Make the change and run it again.
-3. Read *every* flip. The totals lie: a change can fix five emails and break
-   three and still look like a net win. `scripts/debug-classify.ts` prints the
-   full rule trace for one message when a flip is not obvious.
-4. Only then `--write`.
+## Verification
 
-Rules are cheap to add and hard to remove — prefer narrowing an existing rule or
-adding a context suppressor over introducing a new keyword.
+```bash
+npm run test:classifier
+npm run build
+```
+
+The automated tests prove deterministic zero-token exits, the 1,100-token prompt ceiling, queue payload minimization, strict one-digit parsing, and the Cloudflare three-token output cap.
+
+For a live smoke test, enqueue one synthetic ambiguous message, invoke the function, and verify that:
+
+- the queue message disappears;
+- `email_logs.classification_state` becomes `resolved`;
+- `classification_source` is `cloudflare` or `cache`;
+- token usage columns are populated when Cloudflare returns usage data.
+
+## Rollback
+
+Set `EMAIL_CLASSIFIER_MAX_CALLS_PER_SCAN=0` to stop creating model jobs immediately. Deterministic classifications continue working. The migration is additive; existing `email_logs` and application data remain valid if the Edge Function and Cron job are disabled.

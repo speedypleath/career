@@ -33,3 +33,7 @@ next-env.d.ts
 # logs
 /logs/
 *.log
+
+# supabase temp
+supabase/.temp/
+.temp/

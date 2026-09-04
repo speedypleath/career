@@ -46,7 +46,7 @@ const changes: Array<{ subject: string; sender: string; from: string; to: string
 let skippedLocked = 0
 
 for (const row of rows) {
-  const result = classifyEmailDetailed({
+  const result = await classifyEmailDetailed({
     subject: row.subject || "",
     body: row.body || row.snippet || "",
     sender: row.sender || "",

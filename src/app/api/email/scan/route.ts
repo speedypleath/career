@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
-import { scanEmails, classifyEmail } from "@/lib/email-scanner"
+import { randomUUID } from "node:crypto"
+import { scanEmails, classifyEmailDetailed } from "@/lib/email-scanner"
+import { buildClassificationJob, enqueueClassificationJob } from "@/lib/email-classification-queue"
 import { query } from "@/lib/db"
 import type { EmailLog, Application } from "@/types"
 
@@ -8,7 +10,7 @@ export async function GET() {
     const result = await scanEmails()
     return NextResponse.json({
       success: true,
-      message: `Scan finished. Scanned: ${result.scannedCount}, Matched: ${result.matchedCount}, Skipped: ${result.skippedCount}, New logged: ${result.newEmails.length}`,
+      message: `Scan finished. Scanned: ${result.scannedCount}, Matched: ${result.matchedCount}, Queued: ${result.queuedCount}, Skipped: ${result.skippedCount}, New logged: ${result.newEmails.length}`,
       ...result,
     })
   } catch (error) {
@@ -42,12 +44,11 @@ export async function POST(request: Request) {
     }
 
     const fullContent = snippet || emailBody
-    // The sender drives the noise gate, so it must reach the classifier.
-    const classification = body.classification || classifyEmail(subject, emailBody || fullContent, sender)
     const messageId = body.message_id || `manual-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
 
     // Determine application id if not explicitly passed
     let matchedAppId = application_id || null
+    let matchedApp: Pick<Application, "id" | "company" | "title"> | null = null
     if (!matchedAppId) {
       const apps = await query<Application>(`SELECT id, company, title FROM applications`)
       for (const app of apps.rows) {
@@ -58,22 +59,92 @@ export async function POST(request: Request) {
           fullContent.toLowerCase().includes(cLower)
         ) {
           matchedAppId = app.id
+          matchedApp = app
           break
         }
       }
+    } else {
+      const app = await query<Application>(`SELECT id, company, title FROM applications WHERE id = $1`, [matchedAppId])
+      matchedApp = app.rows[0] || null
     }
 
+    const verdict = body.classification
+      ? null
+      : await classifyEmailDetailed({ subject, body: emailBody || fullContent, sender })
+    const classification = body.classification || verdict?.classification || "unrelated"
+    const queued = verdict?.source === "fallback"
+    const emailLogId = randomUUID()
+    const job = queued
+      ? buildClassificationJob(
+          { subject, body: emailBody || fullContent, sender },
+          {
+            emailLogId,
+            messageId,
+            applicationId: matchedAppId,
+            sender,
+            subject,
+            company: matchedApp?.company || "Unknown Company",
+            role: matchedApp?.title || "Unknown Role",
+            snippet: fullContent.slice(0, 300),
+          },
+        )
+      : null
+
     const insertRes = await query<EmailLog>(
-      `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, received_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO email_logs (
+         id, application_id, message_id, sender, recipient, subject, snippet, body,
+         classification, classification_state, classification_source,
+         classifier_prompt_hash, classifier_prompt_tokens, received_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (message_id) DO UPDATE SET
-         application_id = COALESCE($1, email_logs.application_id),
-         classification = $8
+         application_id = COALESCE($2, email_logs.application_id),
+         classification = CASE WHEN email_logs.manual_override THEN email_logs.classification ELSE $9 END,
+         classification_state = CASE WHEN email_logs.manual_override THEN email_logs.classification_state ELSE $10 END,
+         classification_source = CASE WHEN email_logs.manual_override THEN email_logs.classification_source ELSE $11 END,
+         classifier_prompt_hash = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_hash ELSE $12 END,
+         classifier_prompt_tokens = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_tokens ELSE $13 END
        RETURNING *`,
-      [matchedAppId, messageId, sender, recipient, subject, fullContent.slice(0, 300), emailBody, classification, received_at]
+      [
+        emailLogId,
+        matchedAppId,
+        messageId,
+        sender,
+        recipient,
+        subject,
+        fullContent.slice(0, 300),
+        emailBody,
+        classification,
+        queued ? "pending" : "resolved",
+        queued ? "queue" : body.classification ? "manual" : verdict?.source || "fallback",
+        job?.promptHash || null,
+        job?.estimatedInputTokens || null,
+        received_at,
+      ]
     )
 
     const savedEmail = insertRes.rows[0]
+
+    if (job) {
+      try {
+        await enqueueClassificationJob({ ...job, emailLogId: savedEmail.id })
+      } catch (error) {
+        await query(
+          `UPDATE email_logs
+           SET classification_state = 'failed', classification_source = 'fallback', classification_error = $1
+           WHERE id = $2`,
+          [error instanceof Error ? error.message.slice(0, 500) : "Queue unavailable", savedEmail.id],
+        )
+        throw error
+      }
+
+      return NextResponse.json({
+        success: true,
+        queued: true,
+        email: savedEmail,
+        matchedApplicationId: matchedAppId,
+      }, { status: 202 })
+    }
 
     // If matched, log event and optionally update status
     if (matchedAppId) {

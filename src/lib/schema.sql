@@ -43,6 +43,13 @@ CREATE TABLE IF NOT EXISTS email_logs (
   snippet TEXT DEFAULT '',
   body TEXT DEFAULT '',
   classification TEXT DEFAULT 'unrelated', -- 'confirmation', 'interview', 'assessment', 'rejection', 'question', 'offer', 'unrelated'
+  classification_state TEXT NOT NULL DEFAULT 'resolved', -- 'pending', 'resolved', 'failed'
+  classification_source TEXT NOT NULL DEFAULT 'legacy',
+  classifier_prompt_hash TEXT,
+  classifier_prompt_tokens INTEGER,
+  classifier_completion_tokens INTEGER,
+  classification_error TEXT,
+  classified_at TIMESTAMPTZ,
   -- Set when a human corrects the classification in the UI. Rescans leave these rows alone.
   manual_override BOOLEAN DEFAULT FALSE,
   received_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -50,6 +57,22 @@ CREATE TABLE IF NOT EXISTS email_logs (
 );
 
 ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS manual_override BOOLEAN DEFAULT FALSE;
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classification_state TEXT NOT NULL DEFAULT 'resolved';
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classification_source TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classifier_prompt_hash TEXT;
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classifier_prompt_tokens INTEGER;
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classifier_completion_tokens INTEGER;
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classification_error TEXT;
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classified_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS email_classification_cache (
+  prompt_hash TEXT PRIMARY KEY,
+  classification TEXT NOT NULL,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '30 days'
+);
 
 CREATE TABLE IF NOT EXISTS email_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',
@@ -77,3 +100,4 @@ CREATE INDEX IF NOT EXISTS idx_applications_created_at ON applications(created_a
 CREATE INDEX IF NOT EXISTS idx_application_events_app_id ON application_events(application_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_message_id ON email_logs(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_app_id ON email_logs(application_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_classification_state ON email_logs(classification_state, created_at DESC);

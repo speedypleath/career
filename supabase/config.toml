@@ -1,0 +1,4 @@
+project_id = "career"
+
+[functions.email-classifier-worker]
+verify_jwt = true
