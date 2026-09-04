@@ -4,7 +4,7 @@ import {
   SYSTEM_PROMPT,
 } from "../../supabase/functions/_shared/cloudflare-classifier.ts"
 
-export type EmailClassification = "confirmation" | "interview" | "assessment" | "question" | "rejection" | "offer" | "unrelated"
+export type EmailClassification = "confirmation" | "interview" | "assessment" | "question" | "rejection" | "offer" | "unrelated" | "conference"
 export type ClassifierSource = "gate" | "rule" | "fallback" | "queue" | "cloudflare" | "cache"
 
 export interface ClassificationSignal { category: EmailClassification; label: string; weight: number; evidence: string }
@@ -25,7 +25,7 @@ export interface SenderInfo {
   isAts: boolean; isNoiseSender: boolean; isNoReply: boolean; isPersonal: boolean
 }
 
-export const MAX_MODEL_INPUT_TOKENS = 1_100
+export const MAX_MODEL_INPUT_TOKENS = 1_500
 export const MODEL_INPUT_LIMITS = Object.freeze({ sender: 160, subject: 320, body: 3_700 })
 export { MAX_MODEL_OUTPUT_TOKENS, SYSTEM_PROMPT }
 export const ATS_DOMAINS = [
@@ -35,17 +35,22 @@ export const ATS_DOMAINS = [
   "taleo.net", "breezy.hr", "join.com", "zohorecruit.com",
 ]
 
-const LABELS: EmailClassification[] = ["unrelated", "confirmation", "interview", "assessment", "question", "rejection", "offer"]
-const NOISE_SENDER = /(?:newsletter|digest|marketing|promo|jobalert)|glassdoor\.com|indeed(?:mail)?\.com|ziprecruiter\.com|substack\.com|mailchimp/i
-const NOISE_SHAPE = /\b(?:unsubscribe|weekly digest|job alert|recommended jobs|community update|view in browser)\b/i
-const NON_JOB = /\b(?:conference|paper|poster|grant|scholarship|visa|membership) application\b/i
+const LABELS: EmailClassification[] = ["unrelated", "confirmation", "interview", "assessment", "question", "rejection", "offer", "conference"]
+const NOISE_SENDER = /(?:newsletter|digest|marketing|promo|jobalert|job-alert|messages-noreply@linkedin\.com|burstyourbubble|groundnews|harpercollins|newslettere\.hipo\.ro|hipo\.ro|glassdoor\.com|indeed(?:mail)?\.com|ziprecruiter\.com|substack\.com|mailchimp|medium\.com|quora\.com|greenhouse-jobs)/i
+const NOISE_SHAPE = /\b(?:unsubscribe|weekly digest|daily digest|job alert|recommended jobs|community update|view in browser|manage preferences|newsletter|dream job|show recruiters)\b/i
+const JOB_DIGEST_OR_ALERT = /\b(?:job alert|weekly digest|daily digest|job trends|joburi noi|locuri de munca|recommended jobs|jobs for you|job recommendations|people open to hiring|are hiring in your network|just hired|roles were hired this week|job match for you|career trends in your network)\b/i
+const SECURITY_PASSCODE = /\b(?:one-time[- ]passcode|one-time[- ]password|verification code|security code|passcode|login code|auth code|two-factor|2fa code|confirm your email|reset your password|verify your account)\b/i
+const GENERAL_NEWS_OR_NON_JOB = /\b(?:darkest moment|trusting god|devotional|bible|scripture|breaking news|top headlines|weather update|daily horoscope)\b/i
+const CONFERENCE_EVENT = /\b(?:ADCx?|ADC 202\d|ISMIR(?:-Community)?|Devoxx|QCon|GOTO|KubeCon|PyCon|EuroPython|RustConf|CppCon|React Summit|JSNation|Audio Developer Conference|conference|summit|symposium|hackathon|call for (?:papers|speakers|proposals|volunteers|contributions)|cfp|poster application|poster submission|conference registration|event ticket|onsite volunteer|volunteer call)\b/i
+const NON_JOB = /\b(?:paper|poster|grant|scholarship|visa|membership) application\b/i
 const JOB_CONTEXT = /\b(?:job|role|position|candidate|recruit(?:er|ing|ment)?|hiring|application|interview|assessment|resume|cv)\b/i
 const STRONG_RULES: Array<{ category: EmailClassification; label: string; re: RegExp }> = [
-  { category: "rejection", label: "explicit-rejection", re: /\b(?:not moving forward|will not be moving forward|decided not to proceed|not selected|pursue other candidates|chose someone else|selected another candidate|unable to offer you|regret to inform)\b/i },
-  { category: "offer", label: "explicit-offer", re: /\b(?:pleased to (?:extend|make) (?:you )?an offer|offer you the (?:role|position)|formal offer|offer letter)\b/i },
-  { category: "interview", label: "explicit-interview", re: /\b(?:invite you (?:to|for) (?:an? )?interview|schedule (?:an? |your )?(?:interview|screening call)|book (?:a|your) (?:time|interview)|calendar invitation)\b/i },
-  { category: "assessment", label: "explicit-assessment", re: /\b(?:please (?:complete|take|submit) (?:the|this|a) (?:assessment|test|challenge|take-home)|coding (?:assessment|challenge)|technical assessment)\b/i },
-  { category: "confirmation", label: "explicit-confirmation", re: /\b(?:we (?:have )?received your application|application (?:has been )?(?:received|submitted)|thank you for (?:your interest|applying)|thanks for applying)\b/i },
+  { category: "rejection", label: "explicit-rejection", re: /\b(?:not moving forward|will not be moving forward|decided not to proceed|not selected|pursue other candidates|chose someone else|selected another candidate|unable to offer you|regret to inform|unfortunately,? we (?:have decided|are unable))\b/i },
+  { category: "offer", label: "explicit-offer", re: /\b(?:pleased to (?:extend|make) (?:you )?an offer|offer you the (?:role|position)|formal offer|offer letter|job offer)\b/i },
+  { category: "interview", label: "explicit-interview", re: /\b(?:invite you (?:to|for) (?:an? )?interview|schedule (?:an? |your )?(?:interview|screening call)|book (?:a|your) (?:time|interview)|calendar invitation|invitation to interview)\b/i },
+  { category: "assessment", label: "explicit-assessment", re: /\b(?:please (?:complete|take|submit) (?:the|this|a) (?:assessment|test|challenge|take-home)|coding (?:assessment|challenge)|technical assessment|hackerrank|codility|testgorilla)\b/i },
+  { category: "assessment", label: "complete-application", re: /\b(?:complete (?:the|your) application|finish (?:the|your) application|action required.*application|incomplete application)\b/i },
+  { category: "confirmation", label: "explicit-confirmation", re: /\b(?:we (?:have )?received your application|application (?:has been )?(?:received|submitted)|thank you for (?:your interest|applying)|thanks for applying|your application was sent to)\b/i },
 ]
 const WEAK_RULES: Array<{ category: EmailClassification; re: RegExp }> = [
   { category: "rejection", re: /\b(?:unfortunately|other candidates|not successful)\b/i },
@@ -79,7 +84,7 @@ export function parseSender(raw: string): SenderInfo {
   return {
     raw, displayName: (match?.[1] || "").replace(/^['"]|['"]$/g, "").trim(), email, domain,
     isAts: ATS_DOMAINS.some((candidate) => domain === candidate || domain.endsWith(`.${candidate}`)),
-    isNoiseSender: NOISE_SENDER.test(email), isNoReply, isPersonal: Boolean(email) && !isNoReply,
+    isNoiseSender: NOISE_SENDER.test(email) || NOISE_SENDER.test(raw), isNoReply, isPersonal: Boolean(email) && !isNoReply,
   }
 }
 function emptyScores(): Record<string, number> { return Object.fromEntries(LABELS.map((label) => [label, 0])) }
@@ -98,11 +103,47 @@ export function buildModelPrompt(input: ClassifyInput): string {
 }
 export function estimateTokens(text: string): number { return Math.ceil(text.length / 4) }
 function deterministicExit(norm: NormalizedEmail, sender: SenderInfo): ClassificationResult | null {
+  // 1. One-time passcodes, verification codes, auth tokens are always unrelated
+  if (SECURITY_PASSCODE.test(norm.text)) {
+    return makeResult("unrelated", 0.99, "gate", "authentication or security passcode")
+  }
+
+  // 2. LinkedIn explicit rejection tracking URL
+  if (norm.links.some((link) => /jobs_application_rejected/i.test(link))) {
+    return makeResult("rejection", 0.99, "rule", "LinkedIn rejection tracking tag")
+  }
+
+  // 3. Religious texts / general news / homonym false positives (e.g. biblical "Job's darkest moment")
+  if (GENERAL_NEWS_OR_NON_JOB.test(norm.text) || /harpercollins|groundnews/i.test(sender.raw)) {
+    return makeResult("unrelated", 0.99, "gate", "general news or non-job content")
+  }
+
+  // 4. Job alerts, newsletters, network digests, promo emails
+  if (sender.isNoiseSender || JOB_DIGEST_OR_ALERT.test(norm.text) || (NOISE_SHAPE.test(norm.text) && !sender.isAts)) {
+    return makeResult("unrelated", 0.98, "gate", "bulk sender, digest, or job alert")
+  }
+
+  // 5. Tech conferences, summits, workshops, call for papers/speakers/volunteers
+  if (CONFERENCE_EVENT.test(norm.text)) {
+    return makeResult("conference", 0.96, "rule", "tech conference, summit, or event announcement")
+  }
+
+  // 6. User's own outbound sent messages
+  if (sender.email === "gheorgheandrei13@gmail.com") {
+    return makeResult("unrelated", 0.95, "gate", "outbound email from user")
+  }
+
+  // 7. Non-job applications (e.g. visa, grant)
+  if (NON_JOB.test(norm.text) && !sender.isAts) {
+    return makeResult("unrelated", 0.94, "gate", "non-job application")
+  }
+
   const personalContext = JOB_CONTEXT.test(norm.text)
-  if (norm.links.some((link) => /jobs_application_rejected/i.test(link))) return makeResult("rejection", 0.99, "rule", "LinkedIn rejection tracking tag")
-  if ((sender.isNoiseSender || NOISE_SHAPE.test(norm.text)) && !personalContext) return makeResult("unrelated", 0.97, "gate", "bulk sender or newsletter shape")
-  if (NON_JOB.test(norm.text) && !sender.isAts) return makeResult("unrelated", 0.94, "gate", "non-job application")
-  if (!personalContext && !sender.isAts) return makeResult("unrelated", 0.92, "gate", "no job-search context")
+  if (!personalContext && !sender.isAts) {
+    return makeResult("unrelated", 0.92, "gate", "no job-search context")
+  }
+
+  // 8. Strong job outcome rules
   for (const rule of STRONG_RULES) {
     const match = norm.text.match(rule.re)
     if (!match) continue
@@ -113,6 +154,9 @@ function deterministicExit(norm: NormalizedEmail, sender: SenderInfo): Classific
   return null
 }
 function conservativeFallback(norm: NormalizedEmail): ClassificationResult {
+  if (CONFERENCE_EVENT.test(norm.text)) {
+    return makeResult("conference", 0.90, "fallback", "conference or event signal")
+  }
   for (const weak of WEAK_RULES) {
     const match = norm.text.match(weak.re)
     if (match) return makeResult(weak.category, 0.58, "fallback", "model unavailable; weak deterministic signal", { category: weak.category, label: "weak-fallback", weight: 3, evidence: match[0].slice(0, 100) })

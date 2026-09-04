@@ -31,11 +31,36 @@ export async function GET(
       [id]
     )
 
+    // Fetch suggested matching unlinked emails from radar
+    let suggestedEmails: EmailLog[] = []
+    const cleanCompany = (application.company || "").trim()
+    if (cleanCompany.length >= 2 && cleanCompany.toLowerCase() !== "unknown company") {
+      const firstWord = cleanCompany.split(/[\s,.-]+/)[0]
+      const searchTerm = firstWord.length >= 3 ? firstWord : cleanCompany
+      const suggestedRes = await query<EmailLog>(
+        `SELECT * FROM email_logs
+         WHERE application_id IS NULL
+           AND classification != 'unrelated'
+           AND classification != 'conference'
+           AND (
+             sender ILIKE $1
+             OR subject ILIKE $1
+             OR snippet ILIKE $1
+             OR body ILIKE $1
+           )
+         ORDER BY received_at DESC
+         LIMIT 8`,
+        [`%${searchTerm}%`]
+      )
+      suggestedEmails = suggestedRes.rows
+    }
+
     return NextResponse.json({
       application: {
         ...application,
         events: eventsRes.rows,
         emails: emailsRes.rows,
+        suggestedEmails,
       },
     })
   } catch (error) {

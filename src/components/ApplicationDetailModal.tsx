@@ -21,10 +21,14 @@ import {
   ShieldCheck,
   Inbox,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Link2,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
 import type { Application, ApplicationEvent, EmailLog, ApplicationStatus, WorkplaceType } from "@/types"
-import { getStatusColor, getWorkplaceBadge, getPriorityBadge, formatDate, formatDateTime, cx } from "./format"
+import { getStatusColor, getWorkplaceBadge, getPriorityBadge, getClassificationBadge, formatDate, formatDateTime, cx } from "./format"
 
 interface ApplicationDetailModalProps {
   applicationId: string | null
@@ -41,13 +45,17 @@ export function ApplicationDetailModal({
   onUpdated,
   onDeleted,
 }: ApplicationDetailModalProps) {
-  const [app, setApp] = useState<(Application & { events?: ApplicationEvent[]; emails?: EmailLog[] }) | null>(null)
+  const [app, setApp] = useState<(Application & { events?: ApplicationEvent[]; emails?: EmailLog[]; suggestedEmails?: EmailLog[] }) | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copiedLetter, setCopiedLetter] = useState(false)
-  const [activeTab, setActiveTab] = useState<"details" | "cover_letter" | "timeline" | "edit">("details")
+  const [activeTab, setActiveTab] = useState<"details" | "cover_letter" | "emails" | "timeline" | "edit">("details")
   const [newNote, setNewNote] = useState("")
   const [submittingNote, setSubmittingNote] = useState(false)
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null)
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
+  const [reanalyzingAll, setReanalyzingAll] = useState(false)
+  const [linkingId, setLinkingId] = useState<string | null>(null)
 
   // Edit fields
   const [editTitle, setEditTitle] = useState("")
@@ -200,6 +208,71 @@ export function ApplicationDetailModal({
     setTimeout(() => setCopiedLetter(false), 2000)
   }
 
+  async function refreshDetails() {
+    if (!applicationId) return
+    const res = await fetch(`/api/applications/${applicationId}`)
+    if (res.ok) {
+      const data = await res.json()
+      setApp(data.application)
+    }
+  }
+
+  async function handleReanalyzeEmail(emailId: string) {
+    if (!app) return
+    setReanalyzingId(emailId)
+    try {
+      const res = await fetch("/api/email/reanalyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: emailId }),
+      })
+      if (!res.ok) throw new Error("Failed to reanalyze")
+      await refreshDetails()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Reanalyze failed")
+    } finally {
+      setReanalyzingId(null)
+    }
+  }
+
+  async function handleReanalyzeAll() {
+    if (!app) return
+    setReanalyzingAll(true)
+    try {
+      const res = await fetch("/api/email/reanalyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: app.id }),
+      })
+      if (!res.ok) throw new Error("Failed to reanalyze")
+      await refreshDetails()
+      onUpdated()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Reanalyze failed")
+    } finally {
+      setReanalyzingAll(false)
+    }
+  }
+
+  async function handleLinkEmail(emailId: string) {
+    if (!app) return
+    setLinkingId(emailId)
+    try {
+      const res = await fetch("/api/email/logs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: emailId, application_id: app.id }),
+      })
+      if (!res.ok) throw new Error("Failed to link email")
+      await refreshDetails()
+      onUpdated()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Link failed")
+    } finally {
+      setLinkingId(null)
+    }
+  }
+
   const statusStyle = app ? getStatusColor(app.status) : null
   const workplaceBadge = app ? getWorkplaceBadge(app.workplace_type) : null
   const priorityBadge = app ? getPriorityBadge(app.priority) : null
@@ -350,6 +423,22 @@ export function ApplicationDetailModal({
             {app?.cover_letter && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />}
           </button>
           <button
+            onClick={() => setActiveTab("emails")}
+            className={cx(
+              "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0",
+              activeTab === "emails"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-fg)]"
+            )}
+          >
+            Emails
+            {((app?.emails?.length || 0) + (app?.suggestedEmails?.length || 0)) > 0 && (
+              <span className="rounded-full bg-[var(--color-line)] px-1.5 py-0.2 text-[10px] text-[var(--color-muted)]">
+                {(app?.emails?.length || 0) + (app?.suggestedEmails?.length || 0)}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab("timeline")}
             className={cx(
               "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0",
@@ -462,6 +551,159 @@ export function ApplicationDetailModal({
                     <span className="text-[var(--color-faint)] italic">No cover letter attached to this application.</span>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "emails" && app && (
+            <div className="space-y-6">
+              {/* Header + Reanalyze all */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <h4 className="label">Email Radar</h4>
+                  <p className="text-xs text-[var(--color-muted)]">
+                    Full email history linked to this application, plus suggested matches awaiting a link.
+                  </p>
+                </div>
+                {(app.emails?.length || 0) > 0 && (
+                  <button
+                    onClick={handleReanalyzeAll}
+                    disabled={reanalyzingAll}
+                    className="flex items-center gap-1.5 rounded border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 disabled:opacity-50 transition-colors shrink-0"
+                  >
+                    <RefreshCw className={cx("h-3.5 w-3.5", reanalyzingAll && "animate-spin")} />
+                    {reanalyzingAll ? "Reanalyzing..." : "Reanalyze All"}
+                  </button>
+                )}
+              </div>
+
+              {/* Linked Emails */}
+              <div className="space-y-3">
+                <h5 className="label text-[var(--color-accent)]">Linked Emails</h5>
+                {app.emails && app.emails.length > 0 ? (
+                  app.emails.map((email) => {
+                    const badge = getClassificationBadge(email.classification, email.classification_state)
+                    const isExpanded = expandedEmailId === email.id
+                    const hasBody = Boolean(email.body)
+                    const bodyText = email.body || email.snippet || ""
+                    return (
+                      <div key={email.id} className="rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="text-xs font-semibold text-[var(--color-fg)] leading-snug">{email.subject}</div>
+                            <div className="text-[11px] text-[var(--color-faint)]">
+                              From <span className="text-[var(--color-muted)]">{email.sender}</span> · {formatDateTime(email.received_at)}
+                            </div>
+                          </div>
+                          <span className={cx("shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold", badge.bg)}>
+                            {badge.label}
+                          </span>
+                        </div>
+
+                        {email.classification_error && (
+                          <div className="text-[11px] text-[var(--color-warn)] bg-[var(--color-warn)]/10 border border-[var(--color-warn)]/20 rounded px-2 py-1">
+                            {email.classification_error}
+                          </div>
+                        )}
+
+                        {hasBody ? (
+                          <>
+                            {!isExpanded && email.snippet && (
+                              <div className="text-xs text-[var(--color-muted)] font-mono bg-[var(--color-surface)] p-2 rounded line-clamp-3">
+                                {email.snippet}
+                              </div>
+                            )}
+                            {isExpanded && (
+                              <div className="text-xs text-[var(--color-fg)] font-mono bg-[var(--color-surface)] p-3 rounded whitespace-pre-wrap max-h-[480px] overflow-y-auto leading-relaxed">
+                                {bodyText}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-xs text-[var(--color-faint)] italic bg-[var(--color-surface)] p-2 rounded">
+                            (No email body content stored — this may be a passcode/OTP email.)
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-1">
+                          {hasBody && (
+                            <button
+                              onClick={() => setExpandedEmailId(isExpanded ? null : email.id)}
+                              className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-fg)] transition-colors"
+                            >
+                              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              {isExpanded ? "Collapse" : "View Full Email"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleReanalyzeEmail(email.id)}
+                            disabled={reanalyzingId === email.id}
+                            className="flex items-center gap-1 rounded border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-2 py-1 text-[11px] font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 disabled:opacity-50 transition-colors"
+                          >
+                            <RefreshCw className={cx("h-3 w-3", reanalyzingId === email.id && "animate-spin")} />
+                            {reanalyzingId === email.id ? "Reanalyzing..." : "Reanalyze"}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="text-xs text-[var(--color-faint)] py-4 text-center">
+                    No emails linked to this application yet.
+                  </div>
+                )}
+              </div>
+
+              {/* Suggested Emails */}
+              <div className="space-y-3">
+                <h5 className="label">Suggested Emails</h5>
+                {app.suggestedEmails && app.suggestedEmails.length > 0 ? (
+                  app.suggestedEmails.map((email) => {
+                    const badge = getClassificationBadge(email.classification, email.classification_state)
+                    return (
+                      <div key={email.id} className="rounded border border-dashed border-[var(--color-line)] bg-[var(--color-bg)]/40 p-3 space-y-1.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="text-xs font-semibold text-[var(--color-fg)] leading-snug">{email.subject}</div>
+                            <div className="text-[11px] text-[var(--color-faint)]">
+                              From <span className="text-[var(--color-muted)]">{email.sender}</span> · {formatDateTime(email.received_at)}
+                            </div>
+                          </div>
+                          <span className={cx("shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold", badge.bg)}>
+                            {badge.label}
+                          </span>
+                        </div>
+                        {email.snippet && (
+                          <div className="text-xs text-[var(--color-muted)] font-mono bg-[var(--color-surface)] p-2 rounded line-clamp-2">
+                            {email.snippet}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => handleLinkEmail(email.id)}
+                            disabled={linkingId === email.id}
+                            className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-semibold text-[#0b0c0f] hover:bg-[var(--color-accent)]/90 disabled:opacity-50 transition-colors"
+                          >
+                            <Link2 className="h-3 w-3" />
+                            {linkingId === email.id ? "Linking..." : "Link to Application"}
+                          </button>
+                          <button
+                            onClick={() => handleReanalyzeEmail(email.id)}
+                            disabled={reanalyzingId === email.id}
+                            className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2.5 py-1 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-fg)] disabled:opacity-50 transition-colors"
+                          >
+                            <RefreshCw className={cx("h-3 w-3", reanalyzingId === email.id && "animate-spin")} />
+                            Reanalyze
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="text-xs text-[var(--color-faint)] py-4 text-center">
+                    No suggested emails found for this company.
+                  </div>
+                )}
               </div>
             </div>
           )}
