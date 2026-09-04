@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { normalizeWebhookPayload } from "../src/lib/webhook-payload.ts"
+import { normalizeWebhookPayload, withCreateDefaults } from "../src/lib/webhook-payload.ts"
 
 // The webhook is the one endpoint written for callers we do not control — a
 // cron job, an agent, whatever someone points at it — so it accepts several
@@ -87,7 +87,7 @@ test("the earlier alias wins when several are present", () => {
   assert.equal(p.title, "first")
 })
 
-test("the four enum-ish fields are lowercased, free text is not", () => {
+test("the enum-ish fields are lowercased, free text is not", () => {
   const p = normalizeWebhookPayload({
     title: "Keep My Case",
     company: "Keep My Case Ltd",
@@ -104,12 +104,8 @@ test("the four enum-ish fields are lowercased, free text is not", () => {
   assert.equal(p.company, "Keep My Case Ltd")
 })
 
-test("defaults fill in everything that was not sent", () => {
+test("the always-safe defaults still fill in", () => {
   const p = normalizeWebhookPayload({ title: "t", company: "c" })
-  assert.equal(p.workplace_type, "remote")
-  assert.equal(p.status, "applied")
-  assert.equal(p.application_method, "portal")
-  assert.equal(p.priority, "medium")
   assert.equal(p.source, "webhook")
   assert.equal(p.location, "")
   assert.equal(p.url, "")
@@ -129,28 +125,41 @@ test("a payload without a title or a company is reported as invalid", () => {
   assert.equal(normalizeWebhookPayload({ title: "   ", company: "c" }).title, "")
 })
 
-// KNOWN BAD — locked, not fixed.
-//
-// These four fields are defaulted here, before the route decides whether it is
-// creating an application or merging into an existing one. The merge statement
-// guards every column with COALESCE(NULLIF($n, ''), column), meaning "keep what
-// is there if the caller sent nothing" — but that guard can never fire for
-// these four, because the normalizer has already replaced the empty value with
-// a default.
-//
-// The consequence, confirmed against a running server: a caller that reports a
-// posting a second time mentioning only a url resets status, workplace_type,
-// priority and application_method. An application at "interviewing" goes back
-// to "applied", which is exactly the rewind the pipeline's first invariant
-// forbids everywhere else.
-//
-// The defaults are correct on create and wrong on merge, so the fix is to
-// distinguish the two rather than to drop them. That changes what the endpoint
-// does for existing callers, so it is recorded here rather than made silently.
-test("KNOWN BAD: defaulting these four defeats the merge guard downstream", () => {
+// The four fields below are deliberately NOT defaulted here. They are compared
+// against a stored value by the merge statement's COALESCE(NULLIF($n, ''),
+// column) guard, which can only mean "keep what is there" if an absent field
+// actually arrives empty. Defaulting them at this point used to defeat that
+// guard outright: a caller re-reporting a posting with only a url reset all
+// four, dragging an application at "interviewing" back to "applied".
+
+test("the four merge-guarded fields stay empty when the caller omits them", () => {
   const p = normalizeWebhookPayload({ title: "t", company: "c", url: "https://example.com" })
+  assert.equal(p.status, "")
+  assert.equal(p.workplace_type, "")
+  assert.equal(p.priority, "")
+  assert.equal(p.application_method, "")
+})
+
+test("they are still lowercased when the caller does send them", () => {
+  const p = normalizeWebhookPayload({ status: "Interviewing", workplace_type: "HYBRID", priority: "Top", application_method: "Referral" })
+  assert.equal(p.status, "interviewing")
+  assert.equal(p.workplace_type, "hybrid")
+  assert.equal(p.priority, "top")
+  assert.equal(p.application_method, "referral")
+})
+
+test("a new application still gets every default", () => {
+  const p = withCreateDefaults(normalizeWebhookPayload({ title: "t", company: "c" }))
   assert.equal(p.status, "applied")
   assert.equal(p.workplace_type, "remote")
   assert.equal(p.priority, "medium")
   assert.equal(p.application_method, "portal")
+  assert.equal(p.source, "webhook")
+})
+
+test("defaults never override what the caller actually sent", () => {
+  const p = withCreateDefaults(normalizeWebhookPayload({ title: "t", company: "c", status: "wishlist", priority: "top" }))
+  assert.equal(p.status, "wishlist")
+  assert.equal(p.priority, "top")
+  assert.equal(p.workplace_type, "remote")
 })

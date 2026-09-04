@@ -1,6 +1,7 @@
 import { badRequest, handle, notFound, ok } from "@/lib/api-response"
 import { classifyEmailDetailed } from "@/lib/email-classifier"
 import { buildClassificationJob, enqueueClassificationJob } from "@/lib/email-classification-queue"
+import { shouldReanalyze } from "@/lib/email/reanalyze-guard"
 import { shouldAdvanceStatus, statusForClassification } from "@/lib/email/status"
 import {
   findAllForMatching,
@@ -23,9 +24,16 @@ const SNIPPET_CHARS = 300
 /** Classifications that mean the email belongs to no application at all. */
 const UNATTACHED = new Set(["unrelated", "conference"])
 
-async function reanalyze(emailId: string): Promise<{ queued: boolean; email: EmailLogJoined } | null> {
+async function reanalyze(
+  emailId: string,
+): Promise<{ queued: boolean; skipped?: boolean; email: EmailLogJoined } | null> {
   const email = await findWithApplication(emailId)
   if (!email) return null
+
+  // A classification a person set by hand outranks anything this route would
+  // work out. Both updates below clear manual_override, so without this the
+  // correction and the flag protecting it are both lost.
+  if (!shouldReanalyze(email)) return { queued: false, skipped: true, email }
 
   const content = email.body || email.snippet || ""
 
@@ -110,14 +118,18 @@ export const POST = handle("Failed to reanalyze email", async (request: Request)
   // because each one may advance the application's status for the next.
   if (applicationId) {
     const emails: EmailLogJoined[] = []
+    let skippedCount = 0
     for (const logId of await findIdsByApplication(applicationId)) {
       const result = await reanalyze(logId)
-      if (result) emails.push(result.email)
+      if (!result) continue
+      if (result.skipped) skippedCount++
+      emails.push(result.email)
     }
 
     return ok({
       success: true,
-      reanalyzedCount: emails.length,
+      reanalyzedCount: emails.length - skippedCount,
+      skippedCount,
       emails,
       application: await findById(applicationId),
     })
@@ -126,5 +138,10 @@ export const POST = handle("Failed to reanalyze email", async (request: Request)
   const result = await reanalyze(id!)
   if (!result) return notFound("Email log not found")
 
-  return ok({ success: true, queued: result.queued, email: result.email })
+  return ok({
+    success: true,
+    queued: result.queued,
+    skipped: result.skipped ?? false,
+    email: result.email,
+  })
 })
