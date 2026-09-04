@@ -1,6 +1,4 @@
-import { exec } from "child_process"
 import { randomUUID } from "node:crypto"
-import { promisify } from "util"
 import { query } from "./db"
 import { classifyEmailDetailed } from "./email-classifier"
 import type { EmailClassification } from "./email-classifier"
@@ -17,12 +15,10 @@ import {
 } from "./email/status.ts"
 import { extractCompanyName, extractJobTitle, isAtsSender } from "./email/extract.ts"
 import { findBestMatchingApplication } from "./email/matching.ts"
-import { extractBodyFromGmailPayload } from "./email/mime.ts"
+import { hydrateBodies, searchMessages } from "./email/gog.ts"
 
 export { classifyEmail, classifyEmailDetailed } from "./email-classifier"
 export type { EmailClassification, ClassificationResult } from "./email-classifier"
-
-const execAsync = promisify(exec)
 
 export interface ScanResult {
   source: string
@@ -62,83 +58,14 @@ export async function scanEmails(): Promise<ScanResult> {
     }>(`SELECT * FROM email_settings WHERE id = 'default'`)
     const settings = settingsRes.rows[0]
 
-    // 3. Scan via gog CLI with wide search query covering interviews, follow-ups, rejections, offers
-    let gogMessages: Array<{
-      id: string
-      subject?: string
-      from?: string
-      sender?: string
-      snippet?: string
-      date?: string
-    }> = []
-
+    // 3. Scan via the gog CLI. Transport failures come back in errors[] rather
+    // than thrown, so "blocked" stays distinguishable from "no mail".
     const gogAccount = settings?.gmail_account || "owner@example.com"
-    try {
-      const searchQuery = `newer_than:90d (job OR interview OR "invited to" OR invitation OR screening OR "phone call" OR "next steps" OR "follow up" OR "follow-up" OR "touch base" OR "availability" OR application OR "thank you" OR "thanks for" OR "we got it" OR "your application" OR "update on your application" OR "status of your application" OR rejection OR unfortunately OR "not moving forward" OR "other candidates" OR "not selected" OR offer OR assessment OR challenge OR workablemail OR greenhouse OR ashbyhq OR lever OR smartrecruiters OR pinpoint.email)`
+    const { messages: gogMessages, errors: searchErrors } = await searchMessages(gogAccount)
+    result.errors.push(...searchErrors)
 
-      const { stdout, stderr } = await execAsync(
-        `gog gmail search '${searchQuery}' --json --account ${gogAccount} --max 200`
-      )
-
-      const trimmed = (stdout || "").trim()
-      if (trimmed.startsWith("[")) {
-        gogMessages = JSON.parse(trimmed)
-      } else if (trimmed.startsWith("{")) {
-        const parsed = JSON.parse(trimmed)
-        gogMessages = parsed.messages || parsed.results || parsed.threads || []
-      } else if (trimmed) {
-        result.errors.push(`Gmail scan returned unexpected output: ${trimmed.slice(0, 200)}`)
-      } else if (stderr && stderr.trim()) {
-        result.errors.push(`Gmail scan: ${stderr.trim().slice(0, 300)}`)
-      }
-    } catch (err) {
-      const raw = err instanceof Error
-        ? `${err.message}${(err as { stderr?: string }).stderr ?? ""}`
-        : String(err)
-
-      if (/invalid_grant|expired or revoked|token/i.test(raw)) {
-        result.errors.push(
-          `Gmail access expired for ${gogAccount}. Re-authorize with: gog auth add ${gogAccount}`
-        )
-      } else if (/not found|command not found|ENOENT/i.test(raw)) {
-        result.errors.push(`The 'gog' CLI is not available on PATH — Gmail scanning is disabled.`)
-      } else {
-        result.errors.push(`Gmail scan failed: ${raw.slice(0, 300)}`)
-      }
-    }
-
-    // 3b. Hydrate message bodies via `gog gmail get` (using full format, no --results-only to avoid array truncation on calendar attachments)
-    const bodies = new Map<string, string>()
-    if (gogMessages.length > 0) {
-      const CONCURRENCY = 6
-      const queue = [...gogMessages]
-
-      const worker = async () => {
-        for (;;) {
-          const msg = queue.shift()
-          if (!msg?.id) return
-          try {
-            const { stdout } = await execAsync(
-              `gog gmail get ${msg.id} --account ${gogAccount} --json --format full`,
-              { maxBuffer: 8 * 1024 * 1024 }
-            )
-            const trimmed = (stdout || "").trim()
-            if (!trimmed.startsWith("{")) continue
-            const parsed = JSON.parse(trimmed)
-            const bodyText = extractBodyFromGmailPayload(parsed)
-            if (bodyText) {
-              bodies.set(msg.id, bodyText.slice(0, 8000))
-            }
-          } catch {
-            // Unreadable message shouldn't abort scan
-          }
-        }
-      }
-
-      await Promise.all(
-        Array.from({ length: Math.min(CONCURRENCY, gogMessages.length) }, worker)
-      )
-    }
+    // 3b. Hydrate message bodies. An unreadable message is skipped, not fatal.
+    const bodies = await hydrateBodies(gogMessages, gogAccount)
 
     // 4. Deterministic decisions are applied immediately. Ambiguous messages
     // are persisted as pending and queued for the Supabase Edge Function.

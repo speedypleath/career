@@ -30,8 +30,26 @@ export function normalizeBodyString(input: string): string {
   return looksLikeHtmlBody(text) ? htmlToText(text) : text
 }
 
+/** A MIME part as `gog gmail get --format full` reports it. */
+interface GmailPart {
+  mimeType?: string
+  body?: { data?: string; attachmentId?: string }
+  parts?: GmailPart[]
+}
+
+/**
+ * The envelope gog returns. `body` is sometimes a pre-joined string rather
+ * than a part, and the whole message is sometimes nested under `message`.
+ */
+interface GmailEnvelope {
+  body?: string
+  snippet?: string
+  payload?: GmailPart
+  message?: GmailEnvelope
+}
+
 // Helper to extract clean text body from Gmail API payload with full recursive traversal
-export function extractBodyFromGmailPayload(parsed: any): string {
+export function extractBodyFromGmailPayload(parsed: GmailEnvelope | null | undefined): string {
   if (!parsed) return ""
 
   if (typeof parsed.body === "string" && parsed.body.trim()) {
@@ -46,7 +64,7 @@ export function extractBodyFromGmailPayload(parsed: any): string {
   let plainText = ""
   let htmlText = ""
 
-  function walkParts(part: any) {
+  function walkParts(part: GmailPart | undefined) {
     if (!part) return
 
     if (part.mimeType === "text/plain" && part.body?.data) {

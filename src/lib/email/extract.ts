@@ -17,6 +17,15 @@ export function sanitizeCompany(name: string): string {
 }
 
 // Helper to extract clean company name from email metadata
+/**
+ * KNOWN BUG: `body` is accepted and never read. A company named only in the
+ * message body (rather than the subject or the sender's domain) is therefore
+ * never found — see the "job title is taken as the company" case in
+ * tests/email-extract.test.ts. The parameter is kept so the signature stays
+ * honest about what this function ought to consider, and so fixing it does not
+ * require touching every call site.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function extractCompanyName(subject: string, sender: string, body: string): string {
   // 1. "You're invited to interview with <Company>"
   let m = subject.match(/(?:invited to interview with|interview with|invitation from)\s+([^!.,\n@]+)/i)
