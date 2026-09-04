@@ -46,8 +46,8 @@ export function EmailsView({
   const [ingestBody, setIngestBody] = useState("")
   const [ingestSubmitting, setIngestSubmitting] = useState(false)
 
-  async function fetchEmails() {
-    setLoading(true)
+  async function fetchEmails(silent = false) {
+    if (!silent) setLoading(true)
     try {
       let url = "/api/email/logs?"
       if (filterClass !== "all") url += `classification=${filterClass}&`
@@ -60,13 +60,27 @@ export function EmailsView({
     } catch (err) {
       console.error("Failed to load emails:", err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchEmails()
   }, [filterClass, search])
+
+  const hasPendingClassifications = emails.some(
+    (email) => email.classification_state === "pending",
+  )
+
+  useEffect(() => {
+    if (!hasPendingClassifications) return
+
+    const timer = window.setInterval(() => {
+      void fetchEmails(true)
+    }, 3_000)
+
+    return () => window.clearInterval(timer)
+  }, [hasPendingClassifications, filterClass, search])
 
   async function handleIngestEmail(e: React.FormEvent) {
     e.preventDefault()
@@ -113,7 +127,41 @@ export function EmailsView({
     }
   }
 
-  function getClassificationBadge(classification: string) {
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
+
+  async function handleReanalyze(emailId: string, e?: React.MouseEvent) {
+    if (e) e.stopPropagation()
+    setReanalyzingId(emailId)
+    try {
+      const res = await fetch("/api/email/reanalyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: emailId }),
+      })
+      const data = await res.json()
+      if (data.email) {
+        setEmails((prev) =>
+          prev.map((item) => (item.id === emailId ? { ...item, ...data.email } : item)),
+        )
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail((prev) => (prev ? { ...prev, ...data.email } : null))
+        }
+      }
+    } catch (err) {
+      console.error("Failed to reanalyze email:", err)
+    } finally {
+      setReanalyzingId(null)
+    }
+  }
+
+
+  function getClassificationBadge(classification: string, state?: EmailLog["classification_state"]) {
+    if (state === "pending") {
+      return { bg: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30", label: "CLASSIFYING" }
+    }
+    if (state === "failed") {
+      return { bg: "bg-orange-500/15 text-orange-300 border-orange-500/30", label: "RETRY NEEDED" }
+    }
     switch (classification) {
       case "interview":
         return { bg: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30", label: "INTERVIEW" }
@@ -225,7 +273,7 @@ export function EmailsView({
               </div>
             ) : (
               emails.map((email) => {
-                const badge = getClassificationBadge(email.classification)
+                const badge = getClassificationBadge(email.classification, email.classification_state)
                 const isSelected = selectedEmail?.id === email.id
 
                 return (
@@ -248,9 +296,21 @@ export function EmailsView({
                           {badge.label}
                         </span>
                       </div>
-                      <span className="tnum text-[10px] text-[var(--color-faint)] shrink-0">
-                        {formatAgo(email.received_at || email.created_at)}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleReanalyze(email.id, e)}
+                          disabled={reanalyzingId === email.id}
+                          className="opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface)] rounded px-1.5 py-0.5 text-[10px] text-[var(--color-muted)] hover:text-[var(--color-accent)] border border-transparent hover:border-[var(--color-line)] transition-all flex items-center gap-1"
+                          title="Reanalyze email content"
+                        >
+                          <Sparkles className={cx("h-3 w-3", reanalyzingId === email.id && "animate-spin text-[var(--color-accent)]")} />
+                          <span>{reanalyzingId === email.id ? "Analyzing..." : "Reanalyze"}</span>
+                        </button>
+                        <span className="tnum text-[10px] text-[var(--color-faint)]">
+                          {formatAgo(email.received_at || email.created_at)}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-xs font-medium text-[var(--color-fg)] truncate">
@@ -286,7 +346,7 @@ export function EmailsView({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <span className="label text-[9px]">Classification</span>
-                  <div className="mt-1">
+                  <div className="mt-1 flex items-center gap-1.5">
                     <select
                       value={selectedEmail.classification}
                       onChange={(e) => {
@@ -303,6 +363,17 @@ export function EmailsView({
                       <option value="rejection">Rejection</option>
                       <option value="unrelated">Unrelated</option>
                     </select>
+
+                    <button
+                      type="button"
+                      onClick={() => handleReanalyze(selectedEmail.id)}
+                      disabled={reanalyzingId === selectedEmail.id}
+                      className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-bg)] px-2 py-1 text-xs font-medium text-[var(--color-fg)] hover:bg-[var(--color-surface-hi)] hover:text-[var(--color-accent)] disabled:opacity-50 transition-colors"
+                      title="Reanalyze email content with AI and classifier rules"
+                    >
+                      <Sparkles className={cx("h-3 w-3 text-[var(--color-accent)]", reanalyzingId === selectedEmail.id && "animate-spin")} />
+                      <span>{reanalyzingId === selectedEmail.id ? "Analyzing..." : "Reanalyze"}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -373,7 +444,7 @@ export function EmailsView({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <span className="label text-[9px]">Classification</span>
-                  <div className="mt-1">
+                  <div className="mt-1 flex items-center gap-1.5">
                     <select
                       value={selectedEmail.classification}
                       onChange={(e) => {
@@ -390,6 +461,17 @@ export function EmailsView({
                       <option value="rejection">Rejection</option>
                       <option value="unrelated">Unrelated</option>
                     </select>
+
+                    <button
+                      type="button"
+                      onClick={() => handleReanalyze(selectedEmail.id)}
+                      disabled={reanalyzingId === selectedEmail.id}
+                      className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-bg)] px-2 py-1 text-xs font-medium text-[var(--color-fg)] hover:bg-[var(--color-surface-hi)] hover:text-[var(--color-accent)] disabled:opacity-50 transition-colors"
+                      title="Reanalyze email content with AI and classifier rules"
+                    >
+                      <Sparkles className={cx("h-3 w-3 text-[var(--color-accent)]", reanalyzingId === selectedEmail.id && "animate-spin")} />
+                      <span>{reanalyzingId === selectedEmail.id ? "Analyzing..." : "Reanalyze"}</span>
+                    </button>
                   </div>
                 </div>
 

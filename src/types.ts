@@ -75,6 +75,13 @@ export interface EmailLog {
     | "question"
     | "offer"
     | "unrelated"
+  classification_state?: "pending" | "resolved" | "failed"
+  classification_source?: "gate" | "rule" | "queue" | "cloudflare" | "cache" | "fallback" | "manual" | "legacy"
+  classifier_prompt_hash?: string | null
+  classifier_prompt_tokens?: number | null
+  classifier_completion_tokens?: number | null
+  classification_error?: string | null
+  classified_at?: string | null
   /** Set when a human corrects the classification; rescans must not overwrite it. */
   manual_override: boolean
   received_at: string

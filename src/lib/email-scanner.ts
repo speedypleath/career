@@ -1,8 +1,14 @@
 import { exec } from "child_process"
+import { randomUUID } from "node:crypto"
 import { promisify } from "util"
 import { query } from "./db"
 import { classifyEmailDetailed, ATS_DOMAINS as CLASSIFIER_ATS_DOMAINS } from "./email-classifier"
 import type { EmailClassification } from "./email-classifier"
+import {
+  MAX_QUEUED_CLASSIFICATIONS_PER_SCAN,
+  buildClassificationJob,
+  enqueueClassificationJob,
+} from "./email-classification-queue"
 import type { Application, ApplicationStatus, EmailLog } from "@/types"
 
 export { classifyEmail, classifyEmailDetailed } from "./email-classifier"
@@ -14,6 +20,7 @@ export interface ScanResult {
   source: string
   scannedCount: number
   matchedCount: number
+  queuedCount: number
   /** Messages the classifier judged to be unrelated to any application. */
   skippedCount: number
   newEmails: EmailLog[]
@@ -476,6 +483,7 @@ export async function scanEmails(): Promise<ScanResult> {
     source: "local-scanner",
     scannedCount: 0,
     matchedCount: 0,
+    queuedCount: 0,
     skippedCount: 0,
     newEmails: [],
     errors: [],
@@ -575,7 +583,12 @@ export async function scanEmails(): Promise<ScanResult> {
       )
     }
 
-    // 4. Process, correlate and update discovered messages
+    // 4. Deterministic decisions are applied immediately. Ambiguous messages
+    // are persisted as pending and queued for the Supabase Edge Function.
+    const maxQueued = Math.max(
+      0,
+      Number(process.env.EMAIL_CLASSIFIER_MAX_CALLS_PER_SCAN ?? MAX_QUEUED_CLASSIFICATIONS_PER_SCAN),
+    )
     for (const msg of gogMessages) {
       result.scannedCount++
       const messageId = msg.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -583,13 +596,8 @@ export async function scanEmails(): Promise<ScanResult> {
       const subject = msg.subject || ""
       const body = bodies.get(msg.id) || msg.snippet || ""
       const snippet = (body || msg.snippet || "").slice(0, 300)
-      const verdict = classifyEmailDetailed({ subject, body, sender })
+      const verdict = await classifyEmailDetailed({ subject, body, sender })
       const classification = verdict.classification
-
-      if (classification === "unrelated") {
-        result.skippedCount++
-        continue
-      }
 
       const extractedCompany = extractCompanyName(subject, sender, body)
       const extractedRole = extractJobTitle(subject, body)
@@ -608,9 +616,74 @@ export async function scanEmails(): Promise<ScanResult> {
 
       // Check if already in email_logs
       const existing = await query<EmailLog & { manual_override: boolean }>(
-        `SELECT id, classification, application_id, manual_override FROM email_logs WHERE message_id = $1`,
+        `SELECT id, classification, application_id, manual_override, classification_state FROM email_logs WHERE message_id = $1`,
         [messageId]
       )
+
+      if (verdict.source === "fallback" && result.queuedCount < maxQueued) {
+        if (existing.rows.length > 0) {
+          // At-least-once queue delivery plus the unique message id make
+          // rescans idempotent. A pending or resolved row must not enqueue a
+          // second paid inference request.
+          continue
+        }
+
+        const emailLogId = randomUUID()
+        const job = buildClassificationJob(
+          { subject, body, sender },
+          {
+            emailLogId,
+            messageId,
+            applicationId: matchedAppId,
+            sender,
+            subject,
+            company: extractedCompany,
+            role: extractedRole,
+            snippet,
+          },
+        )
+
+        const pendingRes = await query<EmailLog>(
+          `INSERT INTO email_logs (
+             id, application_id, message_id, sender, recipient, subject, snippet, body,
+             classification, classification_state, classification_source,
+             classifier_prompt_hash, classifier_prompt_tokens, received_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', 'queue', $10, $11, NOW())
+           RETURNING *`,
+          [
+            emailLogId,
+            matchedAppId,
+            messageId,
+            sender,
+            settings?.gmail_account || "",
+            subject,
+            snippet,
+            body,
+            classification,
+            job.promptHash,
+            job.estimatedInputTokens,
+          ],
+        )
+
+        try {
+          await enqueueClassificationJob(job)
+          result.queuedCount++
+          result.newEmails.push(pendingRes.rows[0])
+          continue
+        } catch (error) {
+          // Remove the just-created pending row so the conservative fallback
+          // below can complete normally instead of leaving a stuck job.
+          await query(`DELETE FROM email_logs WHERE id = $1 AND classification_state = 'pending'`, [emailLogId])
+          result.errors.push(
+            `Could not enqueue ${messageId}; used deterministic fallback: ${error instanceof Error ? error.message : String(error)}`,
+          )
+        }
+      }
+
+      if (classification === "unrelated") {
+        result.skippedCount++
+        continue
+      }
 
       if (existing.rows.length === 0) {
         // Auto-create an application when a classified email has nothing to attach to.

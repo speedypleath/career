@@ -67,6 +67,10 @@ export async function PATCH(request: Request) {
       values.push(classification)
       // A human set this deliberately; keep rescans from reverting it.
       updates.push(`manual_override = TRUE`)
+      updates.push(`classification_state = 'resolved'`)
+      updates.push(`classification_source = 'manual'`)
+      updates.push(`classification_error = NULL`)
+      updates.push(`classified_at = NOW()`)
     }
 
     if (updates.length === 0) {

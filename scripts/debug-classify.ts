@@ -27,7 +27,7 @@ const { rows } = await client.query<{ subject: string; sender: string; body: str
 
 for (const row of rows) {
   const norm = normalizeEmail(row.subject, row.body || row.snippet || "")
-  const result = classifyEmailDetailed({ subject: row.subject, body: row.body || row.snippet || "", sender: row.sender })
+  const result = await classifyEmailDetailed({ subject: row.subject, body: row.body || row.snippet || "", sender: row.sender })
 
   console.log("=".repeat(80))
   console.log("subject :", row.subject)

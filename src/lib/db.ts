@@ -1,5 +1,6 @@
 import { Pool, type QueryResultRow } from "pg"
 
+const sslMode = process.env.PGSSLMODE ?? "disable"
 const pool = new Pool({
   host: process.env.PGHOST ?? "127.0.0.1",
   port: Number(process.env.PGPORT ?? 5432),
@@ -8,6 +9,9 @@ const pool = new Pool({
   database: process.env.PGDATABASE ?? "career",
   max: 10,
   idleTimeoutMillis: 30000,
+  ...(sslMode === "require" || sslMode === "verify-full"
+    ? { ssl: { rejectUnauthorized: false } }
+    : {}),
 })
 
 export async function query<T extends QueryResultRow = any>(
