@@ -8,7 +8,7 @@ export async function GET() {
     const result = await scanEmails()
     return NextResponse.json({
       success: true,
-      message: `Scan finished. Scanned: ${result.scannedCount}, Matched: ${result.matchedCount}, New logged: ${result.newEmails.length}`,
+      message: `Scan finished. Scanned: ${result.scannedCount}, Matched: ${result.matchedCount}, Skipped: ${result.skippedCount}, New logged: ${result.newEmails.length}`,
       ...result,
     })
   } catch (error) {
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
     }
 
     const fullContent = snippet || emailBody
-    const classification = body.classification || classifyEmail(subject, fullContent)
+    // The sender drives the noise gate, so it must reach the classifier.
+    const classification = body.classification || classifyEmail(subject, emailBody || fullContent, sender)
     const messageId = body.message_id || `manual-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
 
     // Determine application id if not explicitly passed

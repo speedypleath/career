@@ -90,6 +90,17 @@
     transition: width 600ms var(--ease-meter);
   }
 
+  /* Horizontal rails on narrow screens (modal tabs, status stepper, kanban)
+     stay swipeable but drop the scrollbar chrome, which would otherwise eat
+     a visible strip of an already-tight row. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .skeleton {
     background: linear-gradient(
       90deg,

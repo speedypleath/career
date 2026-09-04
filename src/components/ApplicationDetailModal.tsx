@@ -205,30 +205,30 @@ export function ApplicationDetailModal({
   const priorityBadge = app ? getPriorityBadge(app.priority) : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-4xl rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-2xl my-6 flex flex-col max-h-[88vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-4xl rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-2xl my-2 sm:my-6 flex flex-col max-h-[94vh] sm:max-h-[88vh]">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--color-line)] p-6 bg-[var(--color-surface-hi)]/40">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-lg font-bold text-[var(--color-fg)]">{app?.title || "Application Details"}</h2>
-              <span className="text-sm font-semibold text-[var(--color-accent)]">@ {app?.company}</span>
+        <div className="flex items-start justify-between border-b border-[var(--color-line)] p-4 sm:p-6 bg-[var(--color-surface-hi)]/40 gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base sm:text-lg font-bold text-[var(--color-fg)] truncate">{app?.title || "Application Details"}</h2>
+              <span className="text-xs sm:text-sm font-semibold text-[var(--color-accent)]">@ {app?.company}</span>
               {workplaceBadge && (
-                <span className={cx("rounded border px-2 py-0.5 text-[10px] font-medium uppercase", workplaceBadge.bg)}>
+                <span className={cx("rounded border px-1.5 py-0.2 text-[9px] font-medium uppercase", workplaceBadge.bg)}>
                   {workplaceBadge.label}
                 </span>
               )}
               {priorityBadge && (
-                <span className={cx("rounded border px-1.5 py-0.5 text-[9px]", priorityBadge.bg)}>
+                <span className={cx("rounded border px-1.5 py-0.2 text-[9px] font-mono", priorityBadge.bg)}>
                   {priorityBadge.label}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-[var(--color-faint)] flex-wrap pt-1">
+            <div className="flex items-center gap-2.5 text-xs text-[var(--color-faint)] flex-wrap pt-0.5">
               <span className="flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5" />
-                Applied: {formatDate(app?.applied_at)}
+                {formatDate(app?.applied_at)}
               </span>
               {app?.location && (
                 <span className="flex items-center gap-1">
@@ -250,29 +250,29 @@ export function ApplicationDetailModal({
                   className="flex items-center gap-1 text-[var(--color-accent)] hover:underline"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  Listing URL
+                  Link
                 </a>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => setActiveTab(activeTab === "edit" ? "details" : "edit")}
               className={cx(
-                "flex items-center gap-1 rounded border px-2.5 py-1 text-xs transition-colors",
+                "flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors",
                 activeTab === "edit"
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
                   : "border-[var(--color-line)] text-[var(--color-muted)] hover:bg-[var(--color-surface-hi)]"
               )}
             >
               <Edit2 className="h-3.5 w-3.5" />
-              {activeTab === "edit" ? "View" : "Edit"}
+              <span className="hidden sm:inline">{activeTab === "edit" ? "View" : "Edit"}</span>
             </button>
             <button
               onClick={handleDelete}
               title="Delete application"
-              className="rounded border border-[var(--color-danger)]/30 p-1 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/20 transition-colors"
+              className="rounded border border-[var(--color-danger)]/30 p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/20 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -286,11 +286,11 @@ export function ApplicationDetailModal({
         </div>
 
         {/* Status Bar Quick Actions */}
-        <div className="flex items-center justify-between border-b border-[var(--color-line)] px-6 py-2.5 bg-[var(--color-bg)]/60 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--color-line)] px-4 sm:px-6 py-2.5 bg-[var(--color-bg)]/60 text-xs gap-2">
           <div className="flex items-center gap-2">
             <span className="label">Status:</span>
             {statusStyle && (
-              <span className={cx("flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+              <span className={cx("flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium text-[11px]", statusStyle.bg, statusStyle.text, statusStyle.border)}>
                 <span className={cx("h-1.5 w-1.5 rounded-full", statusStyle.dot)} />
                 {statusStyle.label}
               </span>
@@ -298,13 +298,13 @@ export function ApplicationDetailModal({
           </div>
 
           {/* Quick status stepper buttons */}
-          <div className="flex items-center gap-1">
-            <span className="label mr-1">Move to:</span>
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+            <span className="label mr-1 hidden sm:inline">Move:</span>
             {[
               { id: "applied", label: "Applied" },
               { id: "interview_pending", label: "Pending" },
               { id: "interviewing", label: "Interview" },
-              { id: "technical_assessment", label: "Tech Assessment" },
+              { id: "technical_assessment", label: "Assessment" },
               { id: "offer", label: "Offer 🎉" },
               { id: "rejected", label: "Rejected" },
             ].map((st) => (
@@ -312,7 +312,7 @@ export function ApplicationDetailModal({
                 key={st.id}
                 onClick={() => handleQuickStatusChange(st.id as ApplicationStatus)}
                 className={cx(
-                  "rounded border px-2 py-0.5 text-[10px] transition-colors",
+                  "rounded border px-2 py-0.5 text-[10px] whitespace-nowrap shrink-0 transition-colors",
                   app?.status === st.id
                     ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
                     : "border-[var(--color-line)] text-[var(--color-faint)] hover:border-[var(--color-muted)] hover:text-[var(--color-fg)]"
@@ -325,34 +325,34 @@ export function ApplicationDetailModal({
         </div>
 
         {/* Modal Navigation Tabs */}
-        <div className="flex border-b border-[var(--color-line)] px-6 bg-[var(--color-surface)]">
+        <div className="flex border-b border-[var(--color-line)] px-3 sm:px-6 bg-[var(--color-surface)] overflow-x-auto no-scrollbar whitespace-nowrap">
           <button
             onClick={() => setActiveTab("details")}
             className={cx(
-              "px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
+              "px-3 sm:px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0",
               activeTab === "details"
                 ? "border-[var(--color-accent)] text-[var(--color-accent)]"
                 : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-fg)]"
             )}
           >
-            Overview & Description
+            Overview & Job Info
           </button>
           <button
             onClick={() => setActiveTab("cover_letter")}
             className={cx(
-              "flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
+              "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0",
               activeTab === "cover_letter"
                 ? "border-[var(--color-accent)] text-[var(--color-accent)]"
                 : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-fg)]"
             )}
           >
-            Cover Letter & Submission Info
+            Cover Letter & Info
             {app?.cover_letter && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />}
           </button>
           <button
             onClick={() => setActiveTab("timeline")}
             className={cx(
-              "flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
+              "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0",
               activeTab === "timeline"
                 ? "border-[var(--color-accent)] text-[var(--color-accent)]"
                 : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-fg)]"

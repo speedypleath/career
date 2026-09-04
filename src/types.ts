@@ -67,7 +67,16 @@ export interface EmailLog {
   subject: string
   snippet: string
   body: string
-  classification: "confirmation" | "interview" | "rejection" | "question" | "offer" | "unrelated"
+  classification:
+    | "confirmation"
+    | "interview"
+    | "assessment"
+    | "rejection"
+    | "question"
+    | "offer"
+    | "unrelated"
+  /** Set when a human corrects the classification; rescans must not overwrite it. */
+  manual_override: boolean
   received_at: string
   created_at: string
   company?: string

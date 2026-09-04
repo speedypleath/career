@@ -58,10 +58,10 @@ export function OverviewView({
   return (
     <div className="space-y-6">
       {/* Top Banner with Quick Actions */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 sm:p-5">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold tracking-tight text-[var(--color-fg)]">
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--color-fg)]">
               Application Radar & Pipeline
             </h1>
             <span className="inline-flex items-center gap-1 rounded bg-[var(--color-accent)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent)] border border-[var(--color-accent)]/20">
@@ -73,19 +73,19 @@ export function OverviewView({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={onScanEmails}
             disabled={isScanning}
-            className="flex items-center gap-1.5 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-3 py-1.5 text-xs font-medium text-[var(--color-fg)] hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)] active:scale-[0.98] transition-all disabled:opacity-50"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-3 py-1.5 text-xs font-medium text-[var(--color-fg)] hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)] active:scale-[0.98] transition-all disabled:opacity-50"
           >
             <RefreshCw className={cx("h-3.5 w-3.5", isScanning && "animate-spin text-[var(--color-accent)]")} />
-            {isScanning ? "Scanning Gmail..." : "Scan Email Radar"}
+            {isScanning ? "Scanning..." : "Scan Email Radar"}
           </button>
 
           <button
             onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 rounded-[var(--radius-panel)] bg-[var(--color-accent)] px-3.5 py-1.5 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 active:scale-[0.98] transition-all"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-[var(--radius-panel)] bg-[var(--color-accent)] px-3.5 py-1.5 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 active:scale-[0.98] transition-all"
           >
             <Send className="h-3.5 w-3.5" />
             + New Application
@@ -254,22 +254,22 @@ export function OverviewView({
                   <div
                     key={app.id}
                     onClick={() => onSelectApplication(app.id)}
-                    className="group flex items-center justify-between py-3 px-2 rounded hover:bg-[var(--color-surface-hi)] cursor-pointer transition-colors"
+                    className="group flex flex-col sm:flex-row sm:items-center justify-between py-3 px-2 rounded hover:bg-[var(--color-surface-hi)] cursor-pointer transition-colors gap-2"
                   >
-                    <div className="space-y-1 min-w-0 pr-4">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="space-y-1 min-w-0 pr-0 sm:pr-4">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-xs text-[var(--color-fg)] group-hover:text-[var(--color-accent)] transition-colors">
                           {app.title}
                         </span>
                         <span className={cx("text-[9px] px-1.5 py-0.2 rounded border", workplaceBadge.bg)}>
                           {workplaceBadge.label}
                         </span>
-                        <span className={cx("text-[9px] px-1.5 py-0.2 rounded border", priorityBadge.bg)}>
+                        <span className={cx("text-[9px] px-1.5 py-0.2 rounded border font-mono", priorityBadge.bg)}>
                           {priorityBadge.label}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 text-[11px] text-[var(--color-muted)] flex-wrap">
+                      <div className="flex items-center gap-2.5 text-[11px] text-[var(--color-muted)] flex-wrap">
                         <span className="font-medium text-[var(--color-fg)] flex items-center gap-1">
                           <Building className="h-3 w-3 text-[var(--color-faint)]" /> {app.company}
                         </span>
@@ -289,14 +289,14 @@ export function OverviewView({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-[var(--color-line-soft)]">
                       <span className={cx("text-[10px] px-2 py-0.5 rounded border font-medium", statusStyle.bg, statusStyle.text, statusStyle.border)}>
                         {statusStyle.label}
                       </span>
-                      <span className="tnum text-[10px] text-[var(--color-faint)] min-w-14 text-right">
+                      <span className="tnum text-[10px] text-[var(--color-faint)]">
                         {formatAgo(app.applied_at || app.created_at)}
                       </span>
-                      <ArrowUpRight className="h-3.5 w-3.5 text-[var(--color-faint)] group-hover:text-[var(--color-accent)] transition-colors" />
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[var(--color-faint)] group-hover:text-[var(--color-accent)] transition-colors hidden sm:block" />
                     </div>
                   </div>
                 )

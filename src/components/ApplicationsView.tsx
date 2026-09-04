@@ -173,8 +173,111 @@ export function ApplicationsView({
         </div>
       </div>
 
-      {/* Applications Table */}
-      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+      {/* Mobile Card List (md:hidden) */}
+      <div className="space-y-2.5 md:hidden">
+        {filtered.length === 0 ? (
+          <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] py-10 text-center text-xs text-[var(--color-faint)]">
+            No job applications match your filters.
+          </div>
+        ) : (
+          filtered.map((app) => {
+            const statusStyle = getStatusColor(app.status)
+            const workplaceBadge = getWorkplaceBadge(app.workplace_type)
+            const priorityBadge = getPriorityBadge(app.priority)
+
+            return (
+              <div
+                key={app.id}
+                onClick={() => onSelectApplication(app.id)}
+                className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5 space-y-2.5 shadow-sm active:bg-[var(--color-surface-hi)] transition-colors cursor-pointer"
+              >
+                {/* Header: Company & Priority & Workplace */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-xs text-[var(--color-fg)] truncate block">
+                      {app.company}
+                    </span>
+                    <span className="text-[11px] text-[var(--color-muted)] font-medium line-clamp-1">
+                      {app.title}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={cx("text-[9px] px-1.5 py-0.2 rounded border font-mono", priorityBadge.bg)}>
+                      {priorityBadge.label}
+                    </span>
+                    <span className={cx("text-[9px] px-1.5 py-0.2 rounded border", workplaceBadge.bg)}>
+                      {workplaceBadge.label}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Metadata row */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--color-faint)]">
+                  {app.location && (
+                    <span className="flex items-center gap-1">
+                      <Globe className="h-2.5 w-2.5" /> {app.location}
+                    </span>
+                  )}
+                  <span>via {app.application_method}</span>
+                  {app.salary && (
+                    <span className="text-emerald-400/90 font-mono font-medium">{app.salary}</span>
+                  )}
+                  <span className="tnum ml-auto">
+                    {formatAgo(app.applied_at || app.created_at)}
+                  </span>
+                </div>
+
+                {/* Status selector & Actions */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--color-line-soft)]" onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={app.status}
+                    onChange={(e) => onUpdateStatus(app.id, e.target.value as ApplicationStatus)}
+                    className={cx(
+                      "rounded border text-[10px] font-semibold py-1 px-2 focus:outline-none transition-colors cursor-pointer flex-1 max-w-44",
+                      statusStyle.bg,
+                      statusStyle.text,
+                      statusStyle.border
+                    )}
+                  >
+                    <option value="wishlist">Wishlist</option>
+                    <option value="applied">Applied</option>
+                    <option value="interview_pending">Interview Pending</option>
+                    <option value="interviewing">Interviewing</option>
+                    <option value="technical_assessment">Tech Assessment</option>
+                    <option value="offer">Offer 🎉</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="archived">Archived</option>
+                  </select>
+
+                  <div className="flex items-center gap-1.5">
+                    {app.url && (
+                      <a
+                        href={app.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded p-1.5 border border-[var(--color-line)] text-[var(--color-faint)] hover:text-[var(--color-fg)]"
+                        title="Open posting"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    <button
+                      onClick={() => onSelectApplication(app.id)}
+                      className="rounded px-2.5 py-1 text-[10px] font-medium border border-[var(--color-line)] bg-[var(--color-surface-hi)] text-[var(--color-fg)]"
+                    >
+                      Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Desktop Applications Table (hidden on mobile) */}
+      <div className="hidden md:block overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-[var(--color-line)] bg-[var(--color-rail)] text-[10px] uppercase tracking-wider text-[var(--color-faint)]">

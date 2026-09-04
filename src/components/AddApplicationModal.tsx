@@ -81,17 +81,17 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-2xl rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-2xl my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-2xl my-2 sm:my-8 flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-line)] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--color-line)] px-4 sm:px-6 py-3.5 sm:py-4 shrink-0">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
               <Plus className="h-4 w-4" />
             </span>
             <div>
               <h2 className="text-sm font-semibold text-[var(--color-fg)]">Track New Application</h2>
-              <p className="text-xs text-[var(--color-faint)]">Record position details, cover letter, and submission info</p>
+              <p className="text-[11px] text-[var(--color-faint)]">Record position details, cover letter, and submission info</p>
             </div>
           </div>
           <button
@@ -103,14 +103,14 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="rounded border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--color-danger)]">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="label block mb-1.5">Job Title *</label>
               <div className="relative">
@@ -142,7 +142,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="label block mb-1.5">Workplace Type</label>
               <select
@@ -190,7 +190,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="label block mb-1.5">Location</label>
               <input
@@ -231,7 +231,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="label block mb-1.5">Job Posting URL</label>
               <div className="relative">
