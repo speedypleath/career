@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
   Menu,
   Compass,
@@ -24,83 +24,30 @@ import { ApplicationDetailModal } from "@/components/ApplicationDetailModal"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { StatusDot } from "@/components/StatusDot"
 import { cx } from "@/components/format"
-import type { Application, Stats, TabId, ApplicationStatus } from "@/types"
+import { scanEmails, updateApplicationStatus } from "@/lib/api-client"
+import { useDashboard } from "@/hooks/useApplications"
+import type { TabId, ApplicationStatus } from "@/types"
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>("overview")
-  const [applications, setApplications] = useState<Application[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [scanNotice, setScanNotice] = useState<string | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // The fifteen-second poll and the window-focus refetch live in the hook now.
+  const { data, loading, refreshing: isRefreshing, error, reload: loadData, setError } = useDashboard()
+  const { applications, stats } = data
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
 
-  const loadData = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true)
-    setIsRefreshing(true)
-    setError(null)
-    try {
-      const [appsRes, statsRes] = await Promise.all([
-        fetch("/api/applications", { cache: "no-store" }),
-        fetch("/api/stats", { cache: "no-store" }),
-      ])
-
-      if (!appsRes.ok || !statsRes.ok) {
-        throw new Error("Failed to fetch application data from server")
-      }
-
-      const appsData = await appsRes.json()
-      const statsData = await statsRes.json()
-
-      setApplications(appsData.applications || [])
-      setStats(statsData.stats || null)
-    } catch (err) {
-      console.error("Data load error:", err)
-      setError(err instanceof Error ? err.message : "Unknown error loading data")
-    } finally {
-      setLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadData()
-
-    // Poll every 15 seconds for incoming webhooks or automated applications
-    const interval = setInterval(() => {
-      loadData(true)
-    }, 15000)
-
-    // Re-fetch on window focus
-    const handleFocus = () => {
-      loadData(true)
-    }
-    window.addEventListener("focus", handleFocus)
-
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener("focus", handleFocus)
-    }
-  }, [loadData])
-
   async function handleUpdateStatus(id: string, newStatus: ApplicationStatus) {
     try {
-      const res = await fetch(`/api/applications/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      if (res.ok) {
-        loadData(true)
-      }
+      await updateApplicationStatus(id, newStatus)
+      loadData(true)
     } catch (err) {
-      console.error("Failed to update status:", err)
+      setError(err instanceof Error ? err.message : "Could not change the status")
     }
   }
 
@@ -109,25 +56,22 @@ export default function Home() {
     setError(null)
     setScanNotice(null)
     try {
-      const res = await fetch("/api/email/scan", { cache: "no-store" })
-      const data = await res.json().catch(() => null)
+      const result = await scanEmails()
 
-      if (!res.ok) {
-        throw new Error(data?.error || `Gmail scan failed (HTTP ${res.status})`)
-      }
-
-      if (data?.errors?.length) {
-        setError(data.errors.join(" · "))
+      // A scan that finds nothing AND reports errors is blocked, not quiet:
+      // gog is missing, or its token has expired. Those messages say what to
+      // do, so they are shown instead of a bare "0 new".
+      if (result.errors?.length) {
+        setError(result.errors.join(" · "))
       } else {
         setScanNotice(
-          `Gmail scan complete — scanned ${data?.scannedCount ?? 0}, matched ${data?.matchedCount ?? 0}, ${data?.newEmails?.length ?? 0} new.`
+          `Scanned ${result.scannedCount ?? 0} messages, matched ${result.matchedCount ?? 0}, ${result.newEmails?.length ?? 0} new.`,
         )
       }
 
       await loadData(true)
     } catch (err) {
-      console.error("Email scan failed:", err)
-      setError(err instanceof Error ? err.message : "Email scan failed")
+      setError(err instanceof Error ? err.message : "The inbox scan failed")
     } finally {
       setIsScanning(false)
     }
@@ -249,7 +193,6 @@ export default function Home() {
             <EmailsView
               onScanEmails={handleScanEmails}
               isScanning={isScanning}
-              applications={applications}
               onSelectApplication={(id) => setSelectedAppId(id)}
             />
           )}
