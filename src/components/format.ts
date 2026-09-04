@@ -156,3 +156,33 @@ export function getPriorityBadge(priority: string) {
       return { label: "LOW", bg: "bg-zinc-800 text-zinc-400 border-zinc-700/50" }
   }
 }
+
+export function getClassificationBadge(classification: string, state?: string) {
+  if (state === "pending") {
+    return { bg: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30", label: "CLASSIFYING" }
+  }
+  if (state === "failed") {
+    return { bg: "bg-orange-500/15 text-orange-300 border-orange-500/30", label: "RETRY NEEDED" }
+  }
+  switch (classification) {
+    case "interview":
+      return { bg: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30", label: "INTERVIEW" }
+    case "offer":
+      return { bg: "bg-teal-500/20 text-teal-300 border-teal-500/40 font-bold", label: "OFFER 🎉" }
+    case "rejection":
+      return { bg: "bg-rose-500/20 text-rose-400 border-rose-500/30", label: "REJECTION" }
+    case "confirmation":
+      return { bg: "bg-blue-500/20 text-blue-300 border-blue-500/30", label: "CONFIRMATION" }
+    case "assessment":
+      return { bg: "bg-violet-500/20 text-violet-300 border-violet-500/30", label: "ASSESSMENT" }
+    case "question":
+      return { bg: "bg-amber-500/20 text-amber-300 border-amber-500/30", label: "QUESTION" }
+    case "conference":
+      return { bg: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-semibold", label: "CONFERENCE 🎟️" }
+    case "unrelated":
+      return { bg: "bg-zinc-800 text-zinc-500 border-zinc-700", label: "NOT JOB MAIL" }
+    default:
+      return { bg: "bg-zinc-800 text-zinc-400 border-zinc-700", label: "OTHER" }
+  }
+}
+

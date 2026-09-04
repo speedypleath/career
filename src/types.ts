@@ -42,6 +42,8 @@ export interface Application {
   created_at: string
   updated_at: string
   events?: ApplicationEvent[]
+  emails?: EmailLog[]
+  suggestedEmails?: EmailLog[]
   events_count?: number
   emails_count?: number
   latest_event_title?: string
@@ -75,6 +77,7 @@ export interface EmailLog {
     | "question"
     | "offer"
     | "unrelated"
+    | "conference"
   classification_state?: "pending" | "resolved" | "failed"
   classification_source?: "gate" | "rule" | "queue" | "cloudflare" | "cache" | "fallback" | "manual" | "legacy"
   classifier_prompt_hash?: string | null

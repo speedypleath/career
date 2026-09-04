@@ -187,52 +187,100 @@ function extractBodyFromGmailPayload(parsed: any): string {
   return root.snippet || parsed.snippet || ""
 }
 
+const BLACKLISTED_COMPANY_NAMES = new Set([
+  "unknown company",
+  "unknown role",
+  "unknown",
+  "linkedin",
+  "google forms",
+  "forms response receipts",
+  "niv news",
+  "ground news",
+  "groundnews",
+  "joburi hipo",
+  "joburi hipo.ro",
+  "hipo",
+  "hipo.ro",
+  "owner name",
+  "owner",
+  "smartrecruiters",
+  "greenhouse",
+  "workable",
+  "ashby",
+  "lever",
+  "ziyue piao",
+  "adcx",
+  "ismir",
+  "news",
+  "newsletter",
+])
+
+export function sanitizeCompany(name: string): string {
+  const trimmed = name.trim().replace(/^['"]|['"]$/g, "")
+  if (trimmed.length < 2 || trimmed.length > 50) return "Unknown Company"
+  if (BLACKLISTED_COMPANY_NAMES.has(trimmed.toLowerCase())) return "Unknown Company"
+  if (/@|\b(?:newsletter|unsubscribe|digest|no-reply|noreply|passcode|verification)\b/i.test(trimmed)) {
+    return "Unknown Company"
+  }
+  return trimmed
+}
+
 // Helper to extract clean company name from email metadata
 export function extractCompanyName(subject: string, sender: string, body: string): string {
   // 1. "You're invited to interview with <Company>"
   let m = subject.match(/(?:invited to interview with|interview with|invitation from)\s+([^!.,\n@]+)/i)
   if (m && m[1].trim().length > 1) {
-    return m[1].trim()
+    const s = sanitizeCompany(m[1])
+    if (s !== "Unknown Company") return s
   }
 
   // 2. LinkedIn Easy Apply: "Alex, your application was sent to <Company>"
   m = subject.match(/application was sent to\s+([^!.,\n]+)/i)
   if (m && m[1].trim().length > 1) {
-    return m[1].trim()
+    const s = sanitizeCompany(m[1])
+    if (s !== "Unknown Company") return s
   }
 
   // 3. "Your application to <Role> at <Company>" / "Your update from <Company>" / "Action Required for <Role> at <Company>"
   m = subject.match(/(?:application to|applied for|applied to|action required for|next steps for your job application:).+?\s+at\s+([^!.,\n]+)/i)
   if (m && m[1].trim().length > 1) {
-    return m[1].trim()
+    const s = sanitizeCompany(m[1])
+    if (s !== "Unknown Company") return s
   }
 
   m = subject.match(/update from\s+([^!.,\n]+)/i)
   if (m && m[1].trim().length > 1) {
-    return m[1].trim()
+    const s = sanitizeCompany(m[1])
+    if (s !== "Unknown Company") return s
   }
 
   // 4. "Thank you for applying to <Company>" / "Thanks for applying to <Company>"
   m = subject.match(/(?:applying to join|applying to|application to|interest in joining|interest in|application with)\s+([A-Za-z0-9\s._&-]+?)(?:!|\.|\(|$|\s+team|\s+hiring|\s+owner)/i)
   if (m && m[1].trim().length > 1) {
-    return m[1].trim()
+    const s = sanitizeCompany(m[1])
+    if (s !== "Unknown Company") return s
   }
 
   // 5. "Update on your application at <Company>" / "Application received - <Company>"
   m = subject.match(/(?:application at|application -|application:)\s+([^!.,\n]+)/i)
   if (m && m[1].trim().length > 1) {
-    return m[1].trim()
+    const s = sanitizeCompany(m[1])
+    if (s !== "Unknown Company") return s
   }
 
   // 6. "<Company> | Job Application" / "<Company> | Application Received"
   if (subject.includes(" | ")) {
     const parts = subject.split(" | ")
     if (parts[0].trim().length > 1 && parts[0].trim().length < 40 && !parts[0].toLowerCase().includes("invitation") && !parts[0].toLowerCase().includes("technical interview")) {
-      return parts[0].trim()
+      const s = sanitizeCompany(parts[0])
+      if (s !== "Unknown Company") return s
     }
     if (parts.length > 2 && parts[2].trim().length > 1 && parts[2].trim().length < 40) {
       const p = parts[2].trim()
-      if (!p.toLowerCase().includes("invitation")) return p
+      if (!p.toLowerCase().includes("invitation")) {
+        const s = sanitizeCompany(p)
+        if (s !== "Unknown Company") return s
+      }
     }
   }
 
@@ -240,10 +288,12 @@ export function extractCompanyName(subject: string, sender: string, body: string
   if (subject.includes(" - ")) {
     const parts = subject.split(" - ")
     if (parts[1] && parts[1].trim().length > 1 && parts[1].trim().length < 40) {
-      return parts[1].trim()
+      const s = sanitizeCompany(parts[1])
+      if (s !== "Unknown Company") return s
     }
     if (parts[0] && parts[0].trim().length > 1 && parts[0].trim().length < 40 && !parts[0].toLowerCase().includes("application") && !parts[0].toLowerCase().includes("invitation")) {
-      return parts[0].trim()
+      const s = sanitizeCompany(parts[0])
+      if (s !== "Unknown Company") return s
     }
   }
 
@@ -267,10 +317,12 @@ export function extractCompanyName(subject: string, sender: string, body: string
           ) {
             const domainName = domain.split(".")[0]
             if (domainName.length > 1) {
-              return domainName.charAt(0).toUpperCase() + domainName.slice(1)
+              const s = sanitizeCompany(domainName.charAt(0).toUpperCase() + domainName.slice(1))
+              if (s !== "Unknown Company") return s
             }
           }
-          return cleaned
+          const s = sanitizeCompany(cleaned)
+          if (s !== "Unknown Company") return s
         }
       }
 
@@ -281,7 +333,8 @@ export function extractCompanyName(subject: string, sender: string, body: string
       ) {
         const domainName = domain.split(".")[0]
         if (domainName.length > 1) {
-          return domainName.charAt(0).toUpperCase() + domainName.slice(1)
+          const s = sanitizeCompany(domainName.charAt(0).toUpperCase() + domainName.slice(1))
+          if (s !== "Unknown Company") return s
         }
       }
     } else if (sender.includes("@")) {
@@ -292,7 +345,8 @@ export function extractCompanyName(subject: string, sender: string, body: string
       ) {
         const domainName = domain.split(".")[0]
         if (domainName.length > 1) {
-          return domainName.charAt(0).toUpperCase() + domainName.slice(1)
+          const s = sanitizeCompany(domainName.charAt(0).toUpperCase() + domainName.slice(1))
+          if (s !== "Unknown Company") return s
         }
       }
     }
@@ -680,14 +734,33 @@ export async function scanEmails(): Promise<ScanResult> {
         }
       }
 
-      if (classification === "unrelated") {
+      if (classification === "unrelated" || classification === "conference") {
         result.skippedCount++
+        if (existing.rows.length === 0) {
+          const logRes = await query<EmailLog>(
+            `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, classification_state, classification_source, received_at)
+             VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, 'resolved', $8, NOW())
+             RETURNING *`,
+            [messageId, sender, settings?.gmail_account || "", subject, snippet, body, classification, verdict.source]
+          )
+          result.newEmails.push(logRes.rows[0])
+        } else {
+          const existingRow = existing.rows[0]
+          if (!existingRow.manual_override && (existingRow.classification !== classification || existingRow.application_id !== null)) {
+            await query(
+              `UPDATE email_logs SET classification = $1, application_id = NULL, classification_state = 'resolved', classification_source = $2 WHERE id = $3`,
+              [classification, verdict.source, existingRow.id]
+            )
+          }
+        }
         continue
       }
 
       if (existing.rows.length === 0) {
-        // Auto-create an application when a classified email has nothing to attach to.
-        if (!matchedAppId) {
+        // Auto-create an application ONLY when we have a valid, non-blacklisted company name
+        const canCreateApp = extractedCompany !== "Unknown Company" && !BLACKLISTED_COMPANY_NAMES.has(extractedCompany.toLowerCase())
+
+        if (!matchedAppId && canCreateApp) {
           const initStatus = statusForClassification(classification) ?? "applied"
 
           const newAppRes = await query<Application>(

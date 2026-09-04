@@ -175,6 +175,8 @@ export function EmailsView({
         return { bg: "bg-violet-500/20 text-violet-300 border-violet-500/30", label: "ASSESSMENT" }
       case "question":
         return { bg: "bg-amber-500/20 text-amber-300 border-amber-500/30", label: "QUESTION" }
+      case "conference":
+        return { bg: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-semibold", label: "CONFERENCE 🎟️" }
       case "unrelated":
         return { bg: "bg-zinc-800 text-zinc-500 border-zinc-700", label: "NOT JOB MAIL" }
       default:
@@ -249,6 +251,7 @@ export function EmailsView({
             <option value="question">Questions / Follow-ups</option>
             <option value="confirmation">Confirmations</option>
             <option value="rejection">Rejections</option>
+            <option value="conference">Conferences & Events</option>
             <option value="unrelated">Unrelated</option>
           </select>
         </div>
@@ -361,6 +364,7 @@ export function EmailsView({
                       <option value="question">Question</option>
                       <option value="confirmation">Confirmation</option>
                       <option value="rejection">Rejection</option>
+                      <option value="conference">Conference 🎟️</option>
                       <option value="unrelated">Unrelated</option>
                     </select>
 
@@ -459,6 +463,7 @@ export function EmailsView({
                       <option value="question">Question</option>
                       <option value="confirmation">Confirmation</option>
                       <option value="rejection">Rejection</option>
+                      <option value="conference">Conference 🎟️</option>
                       <option value="unrelated">Unrelated</option>
                     </select>
 
