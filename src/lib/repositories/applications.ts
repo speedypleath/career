@@ -324,3 +324,54 @@ export async function mergeFromWebhook(
   return res.rows[0]
 }
 
+
+/** id, company, title and status for every application — the matching probe set. */
+export async function findAllForMatching(): Promise<
+  Pick<Application, "id" | "company" | "title" | "status">[]
+> {
+  const res = await query<Pick<Application, "id" | "company" | "title" | "status">>(
+    `SELECT id, company, title, status FROM applications`,
+  )
+  return res.rows
+}
+
+export async function findBasics(
+  id: string,
+): Promise<Pick<Application, "id" | "company" | "title" | "status"> | null> {
+  const res = await query<Pick<Application, "id" | "company" | "title" | "status">>(
+    `SELECT id, company, title, status FROM applications WHERE id = $1`,
+    [id],
+  )
+  return res.rows[0] ?? null
+}
+
+export async function setStatus(id: string, status: string): Promise<void> {
+  await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [status, id])
+}
+
+/**
+ * The oldest matcher in the codebase: the first application whose company name
+ * appears anywhere in the sender, subject or content.
+ *
+ * src/lib/email/matching.ts is the better one, used by the scanner. This is
+ * kept as-is because the scan and reanalyze routes have always used it and it
+ * decides which application an email is attached to.
+ */
+export function matchByCompanyMention(
+  applications: Pick<Application, "id" | "company" | "title" | "status">[],
+  sender: string,
+  subject: string,
+  content: string,
+): Pick<Application, "id" | "company" | "title" | "status"> | null {
+  for (const app of applications) {
+    const needle = app.company.toLowerCase()
+    if (
+      sender.toLowerCase().includes(needle) ||
+      subject.toLowerCase().includes(needle) ||
+      content.toLowerCase().includes(needle)
+    ) {
+      return app
+    }
+  }
+  return null
+}
