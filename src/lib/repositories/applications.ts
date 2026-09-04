@@ -250,3 +250,77 @@ export async function update(id: string, patch: ApplicationPatch): Promise<Appli
 export async function remove(id: string): Promise<void> {
   await query(`DELETE FROM applications WHERE id = $1`, [id])
 }
+
+/** Case-insensitive match on the pair the webhook treats as an application's identity. */
+export async function findByCompanyAndTitle(
+  company: string,
+  title: string,
+): Promise<Application | null> {
+  const res = await query<Application>(
+    `SELECT * FROM applications WHERE LOWER(company) = LOWER($1) AND LOWER(title) = LOWER($2) LIMIT 1`,
+    [company.trim(), title.trim()],
+  )
+  return res.rows[0] ?? null
+}
+
+/**
+ * Deliberately raw SQL, not Prisma.
+ *
+ * Every column here means "overwrite unless the caller sent nothing", and
+ * notes means "append, never replace" — the webhook must not be able to wipe
+ * a field by omitting it. COALESCE(NULLIF(...)) and CONCAT say that in one
+ * statement; Prisma would need the current row read back first and the merge
+ * done in TypeScript, which is both slower and a race.
+ */
+export async function mergeFromWebhook(
+  id: string,
+  input: {
+    workplace_type: string
+    location: string
+    status: string
+    application_method: string
+    url: string
+    job_description: string
+    info_provided: string
+    cover_letter: string
+    salary: string
+    notes: string
+    priority: string
+  },
+): Promise<Application> {
+  const res = await query<Application>(
+    `
+      UPDATE applications SET
+        workplace_type = COALESCE(NULLIF($1, ''), workplace_type),
+        location = COALESCE(NULLIF($2, ''), location),
+        status = COALESCE(NULLIF($3, ''), status),
+        application_method = COALESCE(NULLIF($4, ''), application_method),
+        url = COALESCE(NULLIF($5, ''), url),
+        job_description = COALESCE(NULLIF($6, ''), job_description),
+        info_provided = COALESCE(NULLIF($7, ''), info_provided),
+        cover_letter = COALESCE(NULLIF($8, ''), cover_letter),
+        salary = COALESCE(NULLIF($9, ''), salary),
+        notes = CASE WHEN $10 <> '' THEN CONCAT(notes, E'\n\n[Webhook Update]: ', $10) ELSE notes END,
+        priority = COALESCE(NULLIF($11, ''), priority),
+        updated_at = NOW()
+      WHERE id = $12
+      RETURNING *
+    `,
+    [
+      input.workplace_type,
+      input.location,
+      input.status,
+      input.application_method,
+      input.url,
+      input.job_description,
+      input.info_provided,
+      input.cover_letter,
+      input.salary,
+      input.notes,
+      input.priority,
+      id,
+    ],
+  )
+  return res.rows[0]
+}
+
