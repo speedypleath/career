@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { badRequest, handle, ok } from "@/lib/api-response"
 import { classifyEmailDetailed, scanEmails } from "@/lib/email-scanner"
 import { buildClassificationJob, enqueueClassificationJob } from "@/lib/email-classification-queue"
+import { shouldAdvanceStatus, statusForClassification } from "@/lib/email/status"
 import { OWNER_EMAIL } from "@/lib/owner"
 import { findAllForMatching, findBasics, matchByCompanyMention, setStatus } from "@/lib/repositories/applications"
 import { markQueueFailed, upsertScanned } from "@/lib/repositories/email-logs"
@@ -17,25 +18,6 @@ export const GET = handle("Email scan failed", async () => {
 })
 
 const SNIPPET_CHARS = 300
-
-/**
- * Status advancement here is NOT the shared statusForClassification /
- * shouldAdvanceStatus pair from src/lib/email/status.ts.
- *
- * This route maps only three classifications rather than five, and it writes
- * the new status with no rank guard at all, so an email can move an
- * application backwards — an interview notice arriving after an offer resets
- * it to "interviewing". Every other writer in the pipeline refuses that.
- *
- * Kept verbatim because changing it changes what this endpoint does. It is the
- * third of four copies of this rule; see CLAUDE.md.
- */
-function statusForIngestedEmail(classification: string): string | null {
-  if (classification === "interview") return "interviewing"
-  if (classification === "offer") return "offer"
-  if (classification === "rejection") return "rejected"
-  return null
-}
 
 /** Ingest or test a single email message. */
 export const POST = handle("Failed to ingest email", async (request: Request) => {
@@ -120,8 +102,15 @@ export const POST = handle("Failed to ingest email", async (request: Request) =>
   }
 
   if (matchedAppId) {
-    const newStatus = statusForIngestedEmail(classification)
-    if (newStatus) await setStatus(matchedAppId, newStatus)
+    // This route used to carry its own copy of the rule: three classifications
+    // instead of five, and no rank check, so ingesting an interview notice
+    // after an offer rewound the application to "interviewing". It now uses the
+    // same pair as the scanner and reanalyze, so status cannot go backwards
+    // here either.
+    const newStatus = statusForClassification(classification)
+    if (newStatus && matched && shouldAdvanceStatus(matched.status, newStatus)) {
+      await setStatus(matchedAppId, newStatus)
+    }
 
     await append(matchedAppId, {
       event_type: "email_received",
