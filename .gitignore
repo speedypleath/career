@@ -37,3 +37,6 @@ next-env.d.ts
 # supabase temp
 supabase/.temp/
 .temp/
+
+# MCP server config (may contain project refs/tokens)
+.mcp.json

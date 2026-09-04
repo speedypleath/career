@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 8098",
     "lint": "eslint",
-    "test:classifier": "node --test --experimental-strip-types tests/email-classifier.test.ts"
+    "test:classifier": "node --test --experimental-strip-types tests/email-classifier.test.ts",
+    "test": "node --test --experimental-strip-types \"tests/*.test.ts\""
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
