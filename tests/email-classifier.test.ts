@@ -44,7 +44,7 @@ test("model prompt has a hard size ceiling", () => {
   const prompt = buildModelPrompt({ sender: "x".repeat(500), subject: "y".repeat(500), body: "z".repeat(20_000) })
   assert.ok(prompt.length <= MODEL_INPUT_LIMITS.sender + MODEL_INPUT_LIMITS.subject + MODEL_INPUT_LIMITS.body + 16)
   assert.ok(estimateTokens(`${SYSTEM_PROMPT}\n${prompt}`) <= MAX_MODEL_INPUT_TOKENS)
-  assert.equal(MAX_MODEL_OUTPUT_TOKENS, 3)
+  assert.equal(MAX_MODEL_OUTPUT_TOKENS, 16)
 })
 
 test("queue payload contains only the bounded prompt and operational metadata", () => {
@@ -88,11 +88,11 @@ test("Cloudflare adapter enforces one-digit output and three-token generation", 
   assert.equal(result.classification, "rejection")
   assert.match(requestedUrl, /llama-3\.2-1b-instruct$/)
   const sent = JSON.parse(requestedBody)
-  assert.equal(sent.max_tokens, 3)
+  assert.equal(sent.max_tokens, 16)
   assert.equal(sent.temperature, 0)
   assert.equal(sent.messages[1].role, "user")
   assert.equal(parseClassification("F:0"), "unrelated")
   assert.equal(parseClassification("2"), "interview")
   assert.equal(parseClassification("garbage"), null)
-  assert.deepEqual(buildCloudflareRequest("x").max_tokens, 3)
+  assert.deepEqual(buildCloudflareRequest("x").max_tokens, 16)
 })

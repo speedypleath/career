@@ -136,6 +136,7 @@ Deno.serve(async () => {
     }, { status: 503 })
   }
 
+
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
