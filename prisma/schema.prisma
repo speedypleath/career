@@ -1,0 +1,120 @@
+// Introspected from Supabase with `prisma db pull`. NEVER run `prisma migrate`.
+//
+// supabase/migrations/*.sql is the sole owner of the schema, the RPCs
+// (finalize_email_classification), the pgmq queue and cron. Prisma is used
+// here only to type CRUD against the five app tables.
+//
+// Deliberately NOT modelled, even though they exist in this database:
+//   email_classification_cache  - written only by the Deno worker
+//   sync_mapping, sync_events   - belong to an unrelated Vikunja sync
+//
+// Prisma 7 keeps the datasource URL in prisma.config.ts, not here.
+// Regenerate after a migration:  npm run db:pull
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model application_events {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id String?       @db.Uuid
+  event_type     String
+  title          String
+  description    String?       @default("")
+  metadata       Json?         @default("{}")
+  created_at     DateTime?     @default(now()) @db.Timestamptz(6)
+  applications   applications? @relation(fields: [application_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([application_id], map: "idx_application_events_app_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model applications {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title              String
+  company            String
+  workplace_type     String               @default("remote")
+  location           String?              @default("")
+  status             String               @default("applied")
+  application_method String               @default("portal")
+  url                String?              @default("")
+  job_description    String?              @default("")
+  info_provided      String?              @default("")
+  cover_letter       String?              @default("")
+  salary             String?              @default("")
+  contact_email      String?              @default("")
+  contact_name       String?              @default("")
+  notes              String?              @default("")
+  priority           String?              @default("medium")
+  source             String?              @default("manual")
+  applied_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  application_events application_events[]
+  email_logs         email_logs[]
+
+  @@index([company], map: "idx_applications_company")
+  @@index([created_at(sort: Desc)], map: "idx_applications_created_at")
+  @@index([status], map: "idx_applications_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model email_logs {
+  id                           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id               String?          @db.Uuid
+  message_id                   String?          @unique
+  sender                       String?          @default("")
+  recipient                    String?          @default("")
+  subject                      String?          @default("")
+  snippet                      String?          @default("")
+  body                         String?          @default("")
+  classification               String?          @default("unrelated")
+  received_at                  DateTime?        @default(now()) @db.Timestamptz(6)
+  created_at                   DateTime?        @default(now()) @db.Timestamptz(6)
+  manual_override              Boolean?         @default(false)
+  classification_state         String           @default("resolved")
+  classification_source        String           @default("legacy")
+  classifier_prompt_hash       String?
+  classifier_prompt_tokens     Int?
+  classifier_completion_tokens Int?
+  classification_error         String?
+  classified_at                DateTime?        @db.Timestamptz(6)
+  applications                 applications?    @relation(fields: [application_id], references: [id], onUpdate: NoAction)
+  email_summaries              email_summaries?
+
+  @@index([application_id], map: "idx_email_logs_app_id")
+  @@index([classification_state, created_at(sort: Desc)], map: "idx_email_logs_classification_state")
+  @@index([message_id], map: "idx_email_logs_message_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model email_settings {
+  id                 String    @id @default("default")
+  imap_host          String    @default("")
+  imap_port          Int       @default(993)
+  imap_user          String    @default("")
+  imap_password      String    @default("")
+  imap_tls           Boolean   @default(true)
+  gmail_account      String    @default("")
+  auto_sync          Boolean   @default(true)
+  sync_interval_mins Int       @default(60)
+  last_synced_at     DateTime? @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model email_summaries {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email_log_id   String     @unique @db.Uuid
+  classification String
+  summary        String
+  created_at     DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime   @default(now()) @db.Timestamptz(6)
+  email_logs     email_logs @relation(fields: [email_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}

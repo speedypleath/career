@@ -8,9 +8,13 @@
     "start": "next start -p 8098",
     "lint": "eslint",
     "test:classifier": "node --test --experimental-strip-types tests/email-classifier.test.ts",
-    "test": "node --test --experimental-strip-types \"tests/*.test.ts\""
+    "test": "node --test --experimental-strip-types \"tests/*.test.ts\"",
+    "db:pull": "prisma db pull && prisma generate",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "lucide-react": "^1.16.0",
     "next": "16.3.2",
     "pg": "^8.13.1",
@@ -23,8 +27,10 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
