@@ -2,7 +2,7 @@
  * Inspect how one stored email flows through the classifier.
  *   node scripts/debug-classify.ts "<subject fragment>"
  */
-import { Client } from "pg"
+import { createClient } from "./lib/db-config.ts"
 import { classifyEmailDetailed, normalizeEmail, parseSender } from "../src/lib/email-classifier.ts"
 
 const needle = process.argv[2]
@@ -11,13 +11,7 @@ if (!needle) {
   process.exit(1)
 }
 
-const client = new Client({
-  host: process.env.PGHOST ?? "127.0.0.1",
-  port: Number(process.env.PGPORT ?? 5432),
-  user: process.env.PGUSER ?? "postgres",
-  password: process.env.PGPASSWORD ?? "postgres",
-  database: process.env.PGDATABASE ?? "career",
-})
+const client = createClient("local")
 await client.connect()
 
 const { rows } = await client.query<{ subject: string; sender: string; body: string; snippet: string; classification: string }>(
