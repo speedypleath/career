@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, ChevronDown, ChevronRight, Clock, Mail, Send } from "lucide-react"
+import { CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clock, Mail, Send } from "lucide-react"
 import { formatDateTime } from "../format"
 import type { ApplicationEvent, EmailLog } from "@/types"
 
@@ -40,6 +40,7 @@ function eventEmailMetadata(event: ApplicationEvent): EmailReceivedMetadata | nu
 export function Timeline({ events, emails, onAddNote, submitting }: TimelineProps) {
   const [note, setNote] = useState("")
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expandedMailIds, setExpandedMailIds] = useState<Set<string>>(new Set())
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -54,6 +55,15 @@ export function Timeline({ events, emails, onAddNote, submitting }: TimelineProp
       const next = new Set(prev)
       if (next.has(eventId)) next.delete(eventId)
       else next.add(eventId)
+      return next
+    })
+  }
+
+  function toggleMailExpanded(emailId: string) {
+    setExpandedMailIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(emailId)) next.delete(emailId)
+      else next.add(emailId)
       return next
     })
   }
@@ -85,28 +95,49 @@ export function Timeline({ events, emails, onAddNote, submitting }: TimelineProp
       {emails.length > 0 && (
         <div className="space-y-2">
           <h5 className="text-xs font-semibold text-[var(--color-fg)]">Mail received</h5>
-          {emails.map((email) => (
-            <div
-              key={email.id}
-              className="rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-3 space-y-1.5"
-            >
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="font-semibold text-[var(--color-fg)] truncate">{email.subject}</span>
-                <span className="text-3xs text-[var(--color-faint)] shrink-0">
-                  {formatDateTime(email.received_at)}
-                </span>
-              </div>
-              <div className="text-2xs text-[var(--color-faint)]">
-                From <span className="text-[var(--color-muted)]">{email.sender}</span> · read as{" "}
-                <span className="text-[var(--color-muted)]">{email.classification}</span>
-              </div>
-              {email.snippet && (
-                <div className="text-xs text-[var(--color-muted)] font-mono bg-[var(--color-surface)] p-2 rounded line-clamp-3">
-                  {email.snippet}
+          {emails.map((email) => {
+            const mailExpanded = expandedMailIds.has(email.id)
+            const hasBody = Boolean(email.body)
+
+            return (
+              <div
+                key={email.id}
+                className="rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-3 space-y-1.5"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-[var(--color-fg)] truncate">{email.subject}</span>
+                  <span className="text-3xs text-[var(--color-faint)] shrink-0">
+                    {formatDateTime(email.received_at)}
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
+                <div className="text-2xs text-[var(--color-faint)]">
+                  From <span className="text-[var(--color-muted)]">{email.sender}</span> · read as{" "}
+                  <span className="text-[var(--color-muted)]">{email.classification}</span>
+                </div>
+                {hasBody && mailExpanded ? (
+                  <div className="text-xs text-[var(--color-fg)] font-mono bg-[var(--color-surface)] p-3 rounded whitespace-pre-wrap max-h-[480px] overflow-y-auto leading-relaxed">
+                    {email.body}
+                  </div>
+                ) : (
+                  email.snippet && (
+                    <div className="text-xs text-[var(--color-muted)] font-mono bg-[var(--color-surface)] p-2 rounded line-clamp-3">
+                      {email.snippet}
+                    </div>
+                  )
+                )}
+                {hasBody && (
+                  <button
+                    type="button"
+                    onClick={() => toggleMailExpanded(email.id)}
+                    className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-1 text-2xs text-[var(--color-muted)] hover:text-[var(--color-fg)] transition-colors"
+                  >
+                    {mailExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    {mailExpanded ? "Collapse" : "Read full email"}
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
