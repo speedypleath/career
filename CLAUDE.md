@@ -26,6 +26,20 @@ every stored email and diffs against what is saved — run it before and after
 touching classification rules; `node scripts/debug-classify.ts "<subject fragment>"`
 prints the rule trace for up to 3 matching stored emails.
 
+Scripts read `PG*` / `DATABASE_URL` straight off the environment, and `.env`
+uses `export` prefixes plus `${VAR}` interpolation that dotenv does not expand.
+So the shell has to source it first — this is also why every `.vscode/launch.json`
+config is `node-terminal` rather than using `envFile`:
+
+```bash
+set -a; . ./.env; set +a; node scripts/eval-classifier.ts
+```
+
+**What that gate does not cover:** it re-runs `classifyEmailDetailed` over stored
+rows. It never enters `scanEmails`, so an empty diff says nothing about the four
+write branches, the queue, or status advancement. For changes there, diff the
+SQL templates before and after as well.
+
 ## Deployment shape
 
 The app runs on a Mac mini as launchd job `com.openclaw.career`, pointed at a
@@ -200,6 +214,20 @@ dropped that write when it replaced the function.
 ## Conventions
 
 - No semicolons, double quotes, 2-space indent — match the surrounding file.
+- **Never copy props into state from an effect** — `react-hooks/set-state-in-effect`
+  is an error, not a warning. Seed `useState` from props at mount and let the
+  parent `key` the child on the record id so a new record remounts it
+  (`EditForm`, `SettingsForm`).
+- `buildApplicationUpdate` drops `undefined` keys, so a field omitted from a
+  PATCH is left unwritten. A form with no control for a column should omit it,
+  not round-trip a stale copy.
+- Design tokens: the accent has one job — the thing to act on. Nav, healthy
+  services, focus rings and selection are monochrome; only warn/danger carry
+  other colour. No arbitrary `text-[Npx]`: use `--text-3xs` / `--text-2xs`
+  below Tailwind's `xs`. The `.label` eyebrow utility is gone; don't reinstate it.
+- zsh does not word-split unquoted `$(...)`, and macOS `sed -i` needs an empty
+  backup arg. Bulk edits:
+  `grep -rl PAT src --include='*.tsx' | tr '\n' '\0' | xargs -0 sed -i '' -e 's/…/…/g'`
 - `@/*` maps to `src/*`. `scripts/` and `supabase/functions/email-classifier-worker`
   are excluded from the Next `tsconfig`, so they run standalone
   (`node scripts/x.ts`, type-stripped) and can use Deno/`npm:` imports.
