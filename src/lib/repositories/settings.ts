@@ -28,17 +28,38 @@ const SETTINGS_ID = "default"
  * `query<EmailSettings>` generic was an unchecked assertion, so nothing caught
  * the mismatch; Prisma types the columns honestly, so the conversion belongs
  * here. Serializing to ISO is exactly what NextResponse.json already did.
+ *
+ * Every column but `id` is nullable at the DB level (see the `email_settings`
+ * model in prisma/schema.prisma, introspected from the real table) even
+ * though each has a DB-side default — Prisma's generated type reflects
+ * nullability honestly, not defaultedness. So every field here is optional,
+ * and toWire() below falls back to the same values `defaults()` uses.
  */
-type SettingsRow = Omit<EmailSettings, "last_synced_at" | "updated_at" | "imap_password"> & {
+type SettingsRow = {
+  id: string
+  imap_host: string | null
+  imap_port: number | null
+  imap_user: string | null
+  imap_tls: boolean | null
+  gmail_account: string | null
+  auto_sync: boolean | null
+  sync_interval_mins: number | null
   last_synced_at: Date | null
-  updated_at: Date
+  updated_at: Date | null
 }
 
 function toWire(row: SettingsRow): EmailSettings {
   return {
-    ...row,
+    id: row.id,
+    imap_host: row.imap_host ?? "",
+    imap_port: row.imap_port ?? 993,
+    imap_user: row.imap_user ?? "",
+    imap_tls: row.imap_tls ?? true,
+    gmail_account: row.gmail_account ?? OWNER_EMAIL,
+    auto_sync: row.auto_sync ?? true,
+    sync_interval_mins: row.sync_interval_mins ?? 60,
     last_synced_at: row.last_synced_at ? row.last_synced_at.toISOString() : null,
-    updated_at: row.updated_at.toISOString(),
+    updated_at: (row.updated_at ?? new Date()).toISOString(),
   }
 }
 
