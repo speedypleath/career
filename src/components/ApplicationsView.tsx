@@ -31,6 +31,8 @@ interface ApplicationsViewProps {
   onRefresh: () => void
 }
 
+type SortKey = "recent" | "company" | "priority" | "status"
+
 export function ApplicationsView({
   applications,
   onSelectApplication,
@@ -42,7 +44,7 @@ export function ApplicationsView({
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [workplaceFilter, setWorkplaceFilter] = useState<string>("all")
   const [methodFilter, setMethodFilter] = useState<string>("all")
-  const [sortBy, setSortBy] = useState<"recent" | "company" | "priority" | "status">("recent")
+  const [sortBy, setSortBy] = useState<SortKey>("recent")
 
   // Filtered and sorted applications
   const filtered = applications
@@ -162,7 +164,7 @@ export function ApplicationsView({
           {/* Sort By */}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
             className="rounded border border-[var(--color-line)] bg-[var(--color-bg)] px-2.5 py-1.5 text-xs text-[var(--color-fg)] focus:border-[var(--color-accent)] focus:outline-none"
           >
             <option value="recent">Sort: Most Recent</option>
