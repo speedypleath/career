@@ -11,6 +11,8 @@
     "test:classifier": "node --test --experimental-strip-types tests/email-classifier.test.ts",
     "test": "NODE_OPTIONS=\"--experimental-vm-modules --disable-warning=ExperimentalWarning\" jest",
     "db:pull": "prisma db pull && prisma generate",
+    "db:sync:prisma": "node scripts/sync-prisma-dev.mjs",
+    "db:sync:prisma:watch": "node scripts/sync-prisma-dev.mjs --watch",
     "postinstall": "prisma generate",
     "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules --disable-warning=ExperimentalWarning\" jest --watch",
     "test:node": "node --test --experimental-strip-types \"tests/*.test.ts\""
@@ -20,7 +22,7 @@
     "@prisma/client": "^7.10.0",
     "lucide-react": "^1.16.0",
     "next": "16.3.2",
-    "pg": "^8.13.1",
+    "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -39,5 +41,11 @@
     "tailwindcss": "^4",
     "ts-jest": "^29.4.12",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": true,
+    "@prisma/engines@7.10.0": true,
+    "prisma@7.10.0": true,
+    "unrs-resolver@1.12.2": true
   }
 }
