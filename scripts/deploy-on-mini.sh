@@ -57,13 +57,16 @@ if ! launchctl kickstart -k "gui/$(id -u)/$LABEL"; then
 fi
 
 echo "==> Waiting for health check ($HEALTH_URL)"
-for _ in $(seq 1 30); do
-  if curl -fsS -o /dev/null "$HEALTH_URL"; then
-    echo "==> Healthy"
+for attempt in $(seq 1 30); do
+  # Quiet during the loop — a connection-refused while the app restarts is
+  # expected, not a failure. Only the timeout below is worth reporting.
+  if curl -fsS -o /dev/null "$HEALTH_URL" 2>/dev/null; then
+    echo "==> Healthy (after $attempt attempt(s))"
     exit 0
   fi
   sleep 2
 done
 
-echo "!! Health check failed after 60s" >&2
+echo "!! Health check failed: $HEALTH_URL did not respond within 60s" >&2
+curl -fsS -o /dev/null "$HEALTH_URL" || true   # surface the final error in the log
 exit 1
