@@ -35,7 +35,7 @@ const areaClass =
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] text-[var(--color-faint)]">{label}</span>
+      <span className="mb-1 block text-2xs text-[var(--color-faint)]">{label}</span>
       {children}
     </label>
   )

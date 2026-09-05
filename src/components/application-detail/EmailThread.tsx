@@ -26,12 +26,12 @@ function EmailMeta({ email }: { email: EmailLog }) {
         <div className="text-xs font-semibold text-[var(--color-fg)] leading-snug">
           {email.subject}
         </div>
-        <div className="text-[11px] text-[var(--color-faint)]">
+        <div className="text-2xs text-[var(--color-faint)]">
           From <span className="text-[var(--color-muted)]">{email.sender}</span> ·{" "}
           {formatDateTime(email.received_at)}
         </div>
       </div>
-      <span className={cx("shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold", badge.bg)}>
+      <span className={cx("shrink-0 rounded border px-1.5 py-0.5 text-3xs font-semibold", badge.bg)}>
         {badge.label}
       </span>
     </div>
@@ -89,7 +89,7 @@ export function EmailThread({
                 <EmailMeta email={email} />
 
                 {email.classification_error && (
-                  <div className="text-[11px] text-[var(--color-warn)] bg-[var(--color-warn)]/10 border border-[var(--color-warn)]/20 rounded px-2 py-1">
+                  <div className="text-2xs text-[var(--color-warn)] bg-[var(--color-warn)]/10 border border-[var(--color-warn)]/20 rounded px-2 py-1">
                     {email.classification_error}
                   </div>
                 )}
@@ -116,7 +116,7 @@ export function EmailThread({
                   {hasBody && (
                     <button
                       onClick={() => setExpandedId(expanded ? null : email.id)}
-                      className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-fg)] transition-colors"
+                      className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-1 text-2xs text-[var(--color-muted)] hover:text-[var(--color-fg)] transition-colors"
                     >
                       {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       {expanded ? "Collapse" : "Read full email"}
@@ -125,7 +125,7 @@ export function EmailThread({
                   <button
                     onClick={() => onReanalyze(email.id)}
                     disabled={reanalyzingId === email.id}
-                    className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-fg)] disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-1 text-2xs text-[var(--color-muted)] hover:text-[var(--color-fg)] disabled:opacity-50 transition-colors"
                   >
                     <RefreshCw className={cx("h-3 w-3", reanalyzingId === email.id && "animate-spin")} />
                     {reanalyzingId === email.id ? "Reanalyzing" : "Reanalyze"}
@@ -161,7 +161,7 @@ export function EmailThread({
                 <button
                   onClick={() => onLink(email.id)}
                   disabled={linkingId === email.id}
-                  className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-semibold text-[#0b0c0f] hover:bg-[var(--color-accent)]/90 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-2xs font-semibold text-[#0b0c0f] hover:bg-[var(--color-accent)]/90 disabled:opacity-50 transition-colors"
                 >
                   <Link2 className="h-3 w-3" />
                   {linkingId === email.id ? "Linking" : "Link to this application"}
@@ -169,7 +169,7 @@ export function EmailThread({
                 <button
                   onClick={() => onReanalyze(email.id)}
                   disabled={reanalyzingId === email.id}
-                  className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2.5 py-1 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-fg)] disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2.5 py-1 text-2xs text-[var(--color-muted)] hover:text-[var(--color-fg)] disabled:opacity-50 transition-colors"
                 >
                   <RefreshCw className={cx("h-3 w-3", reanalyzingId === email.id && "animate-spin")} />
                   Reanalyze

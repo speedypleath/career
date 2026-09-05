@@ -8,7 +8,9 @@ interface StatusDotProps {
 
 export function StatusDot({ status, className, pulse }: StatusDotProps) {
   const colors = {
-    online: "bg-[var(--color-accent)]",
+    // Healthy is not news. Only a service that wants something from you earns
+    // a colour, which is why online is monochrome and warn/error are not.
+    online: "bg-[var(--color-muted)]",
     warn: "bg-[var(--color-warn)]",
     error: "bg-[var(--color-danger)]",
     offline: "bg-[var(--color-faint)]",

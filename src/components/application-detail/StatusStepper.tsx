@@ -31,7 +31,7 @@ export function StatusStepper({ status, onChange }: StatusStepperProps) {
         {style && (
           <span
             className={cx(
-              "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium text-[11px]",
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium text-2xs",
               style.bg,
               style.text,
               style.border,
@@ -50,7 +50,7 @@ export function StatusStepper({ status, onChange }: StatusStepperProps) {
             key={step.id}
             onClick={() => onChange(step.id)}
             className={cx(
-              "rounded border px-2 py-0.5 text-[10px] whitespace-nowrap shrink-0 transition-colors",
+              "rounded border px-2 py-0.5 text-3xs whitespace-nowrap shrink-0 transition-colors",
               status === step.id
                 ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
                 : "border-[var(--color-line)] text-[var(--color-faint)] hover:border-[var(--color-muted)] hover:text-[var(--color-fg)]",

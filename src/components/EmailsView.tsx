@@ -99,7 +99,7 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-fg)]">Inbox</h1>
-            <span className="inline-flex items-center gap-1 rounded bg-[var(--color-accent)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent)] border border-[var(--color-accent)]/20">
+            <span className="inline-flex items-center gap-1 rounded bg-[var(--color-accent)]/10 px-2 py-0.5 text-3xs font-semibold text-[var(--color-accent)] border border-[var(--color-accent)]/20">
               <Mail className="h-3 w-3" /> {OWNER_EMAIL}
             </span>
           </div>
@@ -150,7 +150,7 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
               <div className="py-12 text-center space-y-2">
                 <Inbox className="h-8 w-8 text-[var(--color-faint)] mx-auto" />
                 <p className="text-xs text-[var(--color-muted)]">Nothing here yet</p>
-                <p className="text-[11px] text-[var(--color-faint)]">
+                <p className="text-2xs text-[var(--color-faint)]">
                   Scan the inbox to pull in recent messages, or add one by hand.
                 </p>
               </div>

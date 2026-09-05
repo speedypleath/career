@@ -3,7 +3,6 @@
 import { useState } from "react"
 import {
   Menu,
-  Compass,
   Plus,
   RefreshCw,
   LayoutDashboard,
@@ -22,6 +21,7 @@ import { SettingsView } from "@/components/SettingsView"
 import { AddApplicationModal } from "@/components/AddApplicationModal"
 import { ApplicationDetailModal } from "@/components/ApplicationDetailModal"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { Skeleton } from "@/components/Skeleton"
 import { StatusDot } from "@/components/StatusDot"
 import { cx } from "@/components/format"
 import { scanEmails, updateApplicationStatus } from "@/lib/api-client"
@@ -94,14 +94,14 @@ export default function Home() {
           </button>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold tracking-wider text-[var(--color-fg)] uppercase">CAREER</span>
-            <span className="text-[9px] font-semibold text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-1 py-0.2 rounded border border-[var(--color-accent)]/20">OPS</span>
+            <span className="text-3xs font-semibold text-[var(--color-muted)] bg-[var(--color-surface)] px-1 py-0.2 rounded border border-[var(--color-line)]">OPS</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <StatusDot status="online" pulse />
-            <span className="text-[10px] text-[var(--color-accent)] font-medium">Live</span>
+            <StatusDot status="online" />
+            <span className="text-3xs text-[var(--color-muted)] font-medium">Connected</span>
           </div>
 
           <button
@@ -109,7 +109,7 @@ export default function Home() {
             title="Refresh"
             className={cx(
               "rounded p-1.5 text-[var(--color-faint)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg)] transition-colors",
-              isRefreshing && "animate-spin text-[var(--color-accent)]"
+              isRefreshing && "animate-spin text-[var(--color-fg)]"
             )}
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -117,7 +117,7 @@ export default function Home() {
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90"
+            className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-2xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Track</span>
@@ -152,54 +152,63 @@ export default function Home() {
               <button
                 onClick={() => setScanNotice(null)}
                 aria-label="Dismiss scan result"
-                className="rounded px-2 py-0.5 text-[10px] text-emerald-400/80 hover:bg-emerald-500/15 hover:text-emerald-200"
+                className="rounded px-2 py-0.5 text-3xs text-emerald-400/80 hover:bg-emerald-500/15 hover:text-emerald-200"
               >
                 Dismiss
               </button>
             </div>
           )}
 
-          {activeTab === "overview" && (
-            <OverviewView
-              stats={stats}
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onScanEmails={handleScanEmails}
-              isScanning={isScanning}
-            />
+          {loading && !stats ? (
+            <div className="space-y-4">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-72 w-full" />
+            </div>
+          ) : (
+            <>
+            {activeTab === "overview" && (
+              <OverviewView
+                stats={stats}
+                applications={applications}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onScanEmails={handleScanEmails}
+                isScanning={isScanning}
+              />
+            )}
+
+            {activeTab === "applications" && (
+              <ApplicationsView
+                applications={applications}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onUpdateStatus={handleUpdateStatus}
+                onRefresh={() => loadData(true)}
+              />
+            )}
+
+            {activeTab === "kanban" && (
+              <KanbanView
+                applications={applications}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onUpdateStatus={handleUpdateStatus}
+              />
+            )}
+
+            {activeTab === "emails" && (
+              <EmailsView
+                onScanEmails={handleScanEmails}
+                isScanning={isScanning}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+              />
+            )}
+
+            {activeTab === "webhook" && <WebhookView />}
+
+            {activeTab === "settings" && <SettingsView />}
+            </>
           )}
-
-          {activeTab === "applications" && (
-            <ApplicationsView
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onUpdateStatus={handleUpdateStatus}
-              onRefresh={() => loadData(true)}
-            />
-          )}
-
-          {activeTab === "kanban" && (
-            <KanbanView
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onUpdateStatus={handleUpdateStatus}
-            />
-          )}
-
-          {activeTab === "emails" && (
-            <EmailsView
-              onScanEmails={handleScanEmails}
-              isScanning={isScanning}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-            />
-          )}
-
-          {activeTab === "webhook" && <WebhookView />}
-
-          {activeTab === "settings" && <SettingsView />}
         </div>
       </main>
 
@@ -208,8 +217,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("overview")}
           className={cx(
-            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "overview" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "overview" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <LayoutDashboard className="h-4 w-4" />
@@ -219,8 +228,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("applications")}
           className={cx(
-            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "applications" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "applications" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <Briefcase className="h-4 w-4" />
@@ -233,8 +242,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("kanban")}
           className={cx(
-            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "kanban" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "kanban" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <Columns3 className="h-4 w-4" />
@@ -244,8 +253,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("emails")}
           className={cx(
-            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "emails" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "emails" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <Mail className="h-4 w-4" />
@@ -258,7 +267,7 @@ export default function Home() {
         <button
           onClick={() => setIsMobileMenuOpen(true)}
           className={cx(
-            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
+            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
             activeTab === "webhook" || activeTab === "settings"
               ? "text-[var(--color-accent)] font-semibold"
               : "text-[var(--color-faint)]"

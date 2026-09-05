@@ -27,12 +27,12 @@ export function Header({ application, editing, onToggleEdit, onDelete, onClose }
             @ {application?.company}
           </span>
           {workplaceBadge && (
-            <span className={cx("rounded border px-1.5 py-0.2 text-[9px] font-medium uppercase", workplaceBadge.bg)}>
+            <span className={cx("rounded border px-1.5 py-0.2 text-3xs font-medium uppercase", workplaceBadge.bg)}>
               {workplaceBadge.label}
             </span>
           )}
           {priorityBadge && (
-            <span className={cx("rounded border px-1.5 py-0.2 text-[9px] font-mono", priorityBadge.bg)}>
+            <span className={cx("rounded border px-1.5 py-0.2 text-3xs font-mono", priorityBadge.bg)}>
               {priorityBadge.label}
             </span>
           )}
