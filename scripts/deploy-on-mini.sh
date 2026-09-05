@@ -16,6 +16,24 @@ echo "==> Resetting to origin/main"
 git fetch --prune origin
 git checkout -f -B main origin/main
 
+# A non-interactive SSH shell (`ssh host 'bash -s'`) sources no profile, so nvm
+# and Homebrew are not on PATH. Load Node the way an interactive shell would —
+# nvm first (honours .nvmrc = Node 22), Homebrew node as a last resort.
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+for _nvm_sh in /opt/homebrew/opt/nvm/nvm.sh "$NVM_DIR/nvm.sh"; do
+  # shellcheck disable=SC1090
+  [ -s "$_nvm_sh" ] && . "$_nvm_sh" && break
+done
+if command -v nvm >/dev/null 2>&1; then
+  nvm use >/dev/null 2>&1 || nvm install >/dev/null 2>&1 || true
+fi
+command -v npm >/dev/null 2>&1 || export PATH="/opt/homebrew/bin:$PATH"
+command -v npm >/dev/null 2>&1 || {
+  echo "!! npm not found on the mini (tried nvm and /opt/homebrew/bin)" >&2
+  exit 127
+}
+echo "==> Using $(command -v node) $(node --version)"
+
 # Build-time env only. The launchd service reads PG* from its plist, not .env;
 # this makes DATABASE_URL / PG* available to `prisma generate` and `next build`.
 # .env uses `export` + ${VAR} interpolation, so it must be sourced, not parsed.
