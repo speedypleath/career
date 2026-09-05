@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
   Menu,
-  Compass,
   Plus,
   RefreshCw,
   LayoutDashboard,
@@ -22,85 +21,33 @@ import { SettingsView } from "@/components/SettingsView"
 import { AddApplicationModal } from "@/components/AddApplicationModal"
 import { ApplicationDetailModal } from "@/components/ApplicationDetailModal"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { Skeleton } from "@/components/Skeleton"
 import { StatusDot } from "@/components/StatusDot"
 import { cx } from "@/components/format"
-import type { Application, Stats, TabId, ApplicationStatus } from "@/types"
+import { scanEmails, updateApplicationStatus } from "@/lib/api-client"
+import { useDashboard } from "@/hooks/useApplications"
+import type { TabId, ApplicationStatus } from "@/types"
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>("overview")
-  const [applications, setApplications] = useState<Application[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [scanNotice, setScanNotice] = useState<string | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // The fifteen-second poll and the window-focus refetch live in the hook now.
+  const { data, loading, refreshing: isRefreshing, error, reload: loadData, setError } = useDashboard()
+  const { applications, stats } = data
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
 
-  const loadData = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true)
-    setIsRefreshing(true)
-    setError(null)
-    try {
-      const [appsRes, statsRes] = await Promise.all([
-        fetch("/api/applications", { cache: "no-store" }),
-        fetch("/api/stats", { cache: "no-store" }),
-      ])
-
-      if (!appsRes.ok || !statsRes.ok) {
-        throw new Error("Failed to fetch application data from server")
-      }
-
-      const appsData = await appsRes.json()
-      const statsData = await statsRes.json()
-
-      setApplications(appsData.applications || [])
-      setStats(statsData.stats || null)
-    } catch (err) {
-      console.error("Data load error:", err)
-      setError(err instanceof Error ? err.message : "Unknown error loading data")
-    } finally {
-      setLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadData()
-
-    // Poll every 15 seconds for incoming webhooks or automated applications
-    const interval = setInterval(() => {
-      loadData(true)
-    }, 15000)
-
-    // Re-fetch on window focus
-    const handleFocus = () => {
-      loadData(true)
-    }
-    window.addEventListener("focus", handleFocus)
-
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener("focus", handleFocus)
-    }
-  }, [loadData])
-
   async function handleUpdateStatus(id: string, newStatus: ApplicationStatus) {
     try {
-      const res = await fetch(`/api/applications/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      if (res.ok) {
-        loadData(true)
-      }
+      await updateApplicationStatus(id, newStatus)
+      loadData(true)
     } catch (err) {
-      console.error("Failed to update status:", err)
+      setError(err instanceof Error ? err.message : "Could not change the status")
     }
   }
 
@@ -109,25 +56,22 @@ export default function Home() {
     setError(null)
     setScanNotice(null)
     try {
-      const res = await fetch("/api/email/scan", { cache: "no-store" })
-      const data = await res.json().catch(() => null)
+      const result = await scanEmails()
 
-      if (!res.ok) {
-        throw new Error(data?.error || `Gmail scan failed (HTTP ${res.status})`)
-      }
-
-      if (data?.errors?.length) {
-        setError(data.errors.join(" · "))
+      // A scan that finds nothing AND reports errors is blocked, not quiet:
+      // gog is missing, or its token has expired. Those messages say what to
+      // do, so they are shown instead of a bare "0 new".
+      if (result.errors?.length) {
+        setError(result.errors.join(" · "))
       } else {
         setScanNotice(
-          `Gmail scan complete — scanned ${data?.scannedCount ?? 0}, matched ${data?.matchedCount ?? 0}, ${data?.newEmails?.length ?? 0} new.`
+          `Scanned ${result.scannedCount ?? 0} messages, matched ${result.matchedCount ?? 0}, ${result.newEmails?.length ?? 0} new.`,
         )
       }
 
       await loadData(true)
     } catch (err) {
-      console.error("Email scan failed:", err)
-      setError(err instanceof Error ? err.message : "Email scan failed")
+      setError(err instanceof Error ? err.message : "The inbox scan failed")
     } finally {
       setIsScanning(false)
     }
@@ -150,14 +94,14 @@ export default function Home() {
           </button>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold tracking-wider text-[var(--color-fg)] uppercase">CAREER</span>
-            <span className="text-[9px] font-semibold text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-1 py-0.2 rounded border border-[var(--color-accent)]/20">OPS</span>
+            <span className="text-3xs font-semibold text-[var(--color-muted)] bg-[var(--color-surface)] px-1 py-0.2 rounded border border-[var(--color-line)]">OPS</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <StatusDot status="online" pulse />
-            <span className="text-[10px] text-[var(--color-accent)] font-medium">Live</span>
+            <StatusDot status="online" />
+            <span className="text-3xs text-[var(--color-muted)] font-medium">Connected</span>
           </div>
 
           <button
@@ -165,7 +109,7 @@ export default function Home() {
             title="Refresh"
             className={cx(
               "rounded p-1.5 text-[var(--color-faint)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg)] transition-colors",
-              isRefreshing && "animate-spin text-[var(--color-accent)]"
+              isRefreshing && "animate-spin text-[var(--color-fg)]"
             )}
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -173,7 +117,7 @@ export default function Home() {
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-[11px] font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90"
+            className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-2.5 py-1 text-2xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Track</span>
@@ -208,55 +152,63 @@ export default function Home() {
               <button
                 onClick={() => setScanNotice(null)}
                 aria-label="Dismiss scan result"
-                className="rounded px-2 py-0.5 text-[10px] text-emerald-400/80 hover:bg-emerald-500/15 hover:text-emerald-200"
+                className="rounded px-2 py-0.5 text-3xs text-emerald-400/80 hover:bg-emerald-500/15 hover:text-emerald-200"
               >
                 Dismiss
               </button>
             </div>
           )}
 
-          {activeTab === "overview" && (
-            <OverviewView
-              stats={stats}
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onScanEmails={handleScanEmails}
-              isScanning={isScanning}
-            />
+          {loading && !stats ? (
+            <div className="space-y-4">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-72 w-full" />
+            </div>
+          ) : (
+            <>
+            {activeTab === "overview" && (
+              <OverviewView
+                stats={stats}
+                applications={applications}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onScanEmails={handleScanEmails}
+                isScanning={isScanning}
+              />
+            )}
+
+            {activeTab === "applications" && (
+              <ApplicationsView
+                applications={applications}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onUpdateStatus={handleUpdateStatus}
+                onRefresh={() => loadData(true)}
+              />
+            )}
+
+            {activeTab === "kanban" && (
+              <KanbanView
+                applications={applications}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onUpdateStatus={handleUpdateStatus}
+              />
+            )}
+
+            {activeTab === "emails" && (
+              <EmailsView
+                onScanEmails={handleScanEmails}
+                isScanning={isScanning}
+                onSelectApplication={(id) => setSelectedAppId(id)}
+              />
+            )}
+
+            {activeTab === "webhook" && <WebhookView />}
+
+            {activeTab === "settings" && <SettingsView />}
+            </>
           )}
-
-          {activeTab === "applications" && (
-            <ApplicationsView
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onUpdateStatus={handleUpdateStatus}
-              onRefresh={() => loadData(true)}
-            />
-          )}
-
-          {activeTab === "kanban" && (
-            <KanbanView
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onUpdateStatus={handleUpdateStatus}
-            />
-          )}
-
-          {activeTab === "emails" && (
-            <EmailsView
-              onScanEmails={handleScanEmails}
-              isScanning={isScanning}
-              applications={applications}
-              onSelectApplication={(id) => setSelectedAppId(id)}
-            />
-          )}
-
-          {activeTab === "webhook" && <WebhookView />}
-
-          {activeTab === "settings" && <SettingsView />}
         </div>
       </main>
 
@@ -265,8 +217,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("overview")}
           className={cx(
-            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "overview" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "overview" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <LayoutDashboard className="h-4 w-4" />
@@ -276,8 +228,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("applications")}
           className={cx(
-            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "applications" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "applications" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <Briefcase className="h-4 w-4" />
@@ -290,8 +242,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("kanban")}
           className={cx(
-            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "kanban" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "kanban" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <Columns3 className="h-4 w-4" />
@@ -301,8 +253,8 @@ export default function Home() {
         <button
           onClick={() => setActiveTab("emails")}
           className={cx(
-            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
-            activeTab === "emails" ? "text-[var(--color-accent)] font-semibold" : "text-[var(--color-faint)]"
+            "relative flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
+            activeTab === "emails" ? "text-[var(--color-fg)] font-semibold" : "text-[var(--color-faint)]"
           )}
         >
           <Mail className="h-4 w-4" />
@@ -315,7 +267,7 @@ export default function Home() {
         <button
           onClick={() => setIsMobileMenuOpen(true)}
           className={cx(
-            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-[10px] font-medium transition-colors",
+            "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
             activeTab === "webhook" || activeTab === "settings"
               ? "text-[var(--color-accent)] font-semibold"
               : "text-[var(--color-faint)]"

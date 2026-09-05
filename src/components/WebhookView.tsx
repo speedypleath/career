@@ -1,81 +1,39 @@
 "use client"
 
 import { useState } from "react"
-import {
-  Webhook,
-  Send,
-  Check,
-  Copy,
-  Terminal,
-  Code,
-  Sparkles,
-  Zap,
-  Globe,
-  CheckCircle2,
-  AlertCircle
-} from "lucide-react"
+import { Check, Code, Copy, Terminal, Zap } from "lucide-react"
+import { ErrorBanner } from "./ErrorBanner"
+import { Skeleton } from "./Skeleton"
 import { StatusDot } from "./StatusDot"
-import { cx } from "./format"
+import { postWebhookApplication } from "@/lib/api-client"
+import { useWebhookInfo } from "@/hooks/useWebhookInfo"
 
-export function WebhookView() {
-  const [copied, setCopied] = useState<string | null>(null)
-  const [testResponse, setTestResponse] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
+const COPIED_MS = 2_000
 
-  // Test form state
-  const [testTitle, setTestTitle] = useState("DSP / Audio Software Engineer")
-  const [testCompany, setTestCompany] = useState("Sennheiser Romania")
-  const [testWorkplace, setTestWorkplace] = useState("hybrid")
-  const [testMethod, setTestMethod] = useState("portal")
-  const [testUrl, setTestUrl] = useState("https://jobs.sennheiser.com/dsp-engineer")
-  const [testSalary, setTestSalary] = useState("€75,000 - €90,000")
-  const [testPriority, setTestPriority] = useState("high")
-  const [testLetter, setTestLetter] = useState("Applied via automated Bucharest sweep script. Included Andrei Gheorghe Audio CV.")
+/** The Tailscale name of the machine the launchd job runs on. */
+const TAILSCALE_HOST = "https://andreis-mac-mini.taile5b997.ts.net"
+const LOCAL_HOST = "http://127.0.0.1:8098"
 
-  function copyToClipboard(text: string, id: string) {
-    navigator.clipboard.writeText(text)
-    setCopied(id)
-    setTimeout(() => setCopied(null), 2000)
-  }
+/**
+ * The parts of the test payload with no control on screen. They were eight
+ * useState calls whose setters were never called.
+ */
+const TEST_DEFAULTS = {
+  application_method: "portal",
+  status: "applied",
+  url: "https://jobs.sennheiser.com/dsp-engineer",
+  salary: "€75,000 - €90,000",
+  priority: "high",
+  cover_letter: "Applied via automated Bucharest sweep script. Included Andrei Gheorghe Audio CV.",
+  info_provided: "CV: andrei-gheorghe-cv.pdf, Notice: immediate, Location: Bucharest",
+  source: "audio-job-hunter-cron",
+}
 
-  async function handleSendTest() {
-    setSending(true)
-    setTestResponse(null)
-    try {
-      const payload = {
-        title: testTitle,
-        company: testCompany,
-        workplace_type: testWorkplace,
-        application_method: testMethod,
-        status: "applied",
-        url: testUrl,
-        salary: testSalary,
-        priority: testPriority,
-        cover_letter: testLetter,
-        info_provided: "CV: andrei-gheorghe-cv.pdf, Notice: immediate, Location: Bucharest",
-        source: "audio-job-hunter-cron",
-      }
-
-      const res = await fetch("/api/webhook/application", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
-      setTestResponse(JSON.stringify(data, null, 2))
-    } catch (err) {
-      setTestResponse(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2))
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const pythonSnippet = `# Add this snippet to audio-job-hunter cron or sweep script whenever an application is submitted:
+const PYTHON_SNIPPET = `# Add this to the audio-job-hunter sweep whenever an application is submitted:
 import requests
 
 def notify_career_app(job_info):
-    webhook_url = "http://127.0.0.1:8098/api/webhook/application"
+    webhook_url = "${LOCAL_HOST}/api/webhook/application"
     payload = {
         "title": job_info.get("title"),
         "company": job_info.get("company"),
@@ -97,172 +55,239 @@ def notify_career_app(job_info):
     except Exception as e:
         print(f"Failed to push to Career Ops webhook: {e}")`
 
-  const curlSnippet = `curl -X POST http://127.0.0.1:8098/api/webhook/application \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "title": "Senior Backend Engineer",
-    "company": "Bitdefender",
-    "workplace_type": "hybrid",
-    "status": "applied",
-    "application_method": "portal",
-    "url": "https://boards.greenhouse.io/bitdefender/jobs/123",
-    "info_provided": "CV: andrei-gheorghe-cv.pdf, Notice: immediate",
-    "cover_letter": "Dear Hiring Manager at Bitdefender...",
-    "source": "audio-job-hunter-cron"
-  }'`
+const inputClass =
+  "w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-2 text-xs text-[var(--color-fg)] focus:border-[var(--color-accent)] focus:outline-none"
+
+function CopyButton({ copied, onCopy, label }: { copied: boolean; onCopy: () => void; label?: string }) {
+  return (
+    <button
+      onClick={onCopy}
+      className="flex items-center gap-1 text-2xs text-[var(--color-faint)] hover:text-[var(--color-accent)] transition-colors"
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+      {label && (copied ? "Copied" : label)}
+    </button>
+  )
+}
+
+function EndpointCard({
+  title,
+  url,
+  copied,
+  onCopy,
+}: {
+  title: string
+  url: string | null
+  copied: boolean
+  onCopy: () => void
+}) {
+  return (
+    <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-2">
+      <span className="text-xs font-semibold text-[var(--color-fg)]">{title}</span>
+      <div className="flex items-center justify-between gap-2 rounded bg-[var(--color-bg)] p-2 font-mono text-xs text-[var(--color-fg)] border border-[var(--color-line-soft)]">
+        {url ? <span className="truncate">POST {url}</span> : <Skeleton className="h-4 w-full" />}
+        {url && <CopyButton copied={copied} onCopy={onCopy} />}
+      </div>
+    </div>
+  )
+}
+
+export function WebhookView() {
+  // The route describes itself — its path, a curl line and the full payload —
+  // so none of that is duplicated here any more.
+  const { data: info, loading, error, reload } = useWebhookInfo()
+
+  const [copied, setCopied] = useState<string | null>(null)
+  const [testResponse, setTestResponse] = useState<string | null>(null)
+  const [testError, setTestError] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
+
+  const [company, setCompany] = useState("Sennheiser Romania")
+  const [title, setTitle] = useState("DSP / Audio Software Engineer")
+  const [workplace, setWorkplace] = useState("hybrid")
+
+  // "POST /api/webhook/application" -> "/api/webhook/application"
+  const path = info ? info.endpoint.replace(/^\S+\s+/, "") : null
+
+  function copy(text: string, id: string) {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), COPIED_MS)
+  }
+
+  async function handleSendTest() {
+    setSending(true)
+    setTestResponse(null)
+    setTestError(null)
+    try {
+      const data = await postWebhookApplication({
+        ...TEST_DEFAULTS,
+        title,
+        company,
+        workplace_type: workplace,
+      })
+      setTestResponse(JSON.stringify(data, null, 2))
+    } catch (err) {
+      setTestError(err instanceof Error ? err.message : "The test request failed")
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold tracking-tight text-[var(--color-fg)]">
-            Webhook & Cron Automation Bridge
-          </h1>
+          <h1 className="text-lg font-bold tracking-tight text-[var(--color-fg)]">Webhook</h1>
           <p className="text-xs text-[var(--color-muted)]">
-            Ingest real-time job applications submitted by the audio-job-hunter background sweep or automated agents
+            {info?.description ||
+              "Record applications posted by the audio-job-hunter sweep or any other agent."}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-[var(--radius-panel)] border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-3 py-1.5 text-xs text-[var(--color-accent)] font-semibold">
-          <StatusDot status="online" pulse />
-          Endpoint Active
+        <div className="flex items-center gap-2 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-muted)] shrink-0">
+          <StatusDot status={error ? "error" : loading ? "offline" : "online"} pulse={!error && !loading} />
+          {loading ? "Checking" : error ? "Not responding" : "Accepting posts"}
         </div>
       </div>
 
-      {/* Endpoint Info Banner */}
+      {error && <ErrorBanner message={error} retry={() => void reload()} />}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-2">
-          <span className="label">Local Ingestion Endpoint</span>
-          <div className="flex items-center justify-between rounded bg-[var(--color-bg)] p-2 font-mono text-xs text-[var(--color-fg)] border border-[var(--color-line-soft)]">
-            <span>POST http://127.0.0.1:8098/api/webhook/application</span>
-            <button
-              onClick={() => copyToClipboard("http://127.0.0.1:8098/api/webhook/application", "local-url")}
-              className="text-[var(--color-faint)] hover:text-[var(--color-accent)]"
-            >
-              {copied === "local-url" ? <Check className="h-3.5 w-3.5 text-[var(--color-accent)]" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-2">
-          <span className="label">Tailscale Secure Ingestion Endpoint</span>
-          <div className="flex items-center justify-between rounded bg-[var(--color-bg)] p-2 font-mono text-xs text-[var(--color-fg)] border border-[var(--color-line-soft)]">
-            <span>POST https://andreis-mac-mini.taile5b997.ts.net/api/webhook/application</span>
-            <button
-              onClick={() => copyToClipboard("https://andreis-mac-mini.taile5b997.ts.net/api/webhook/application", "ts-url")}
-              className="text-[var(--color-faint)] hover:text-[var(--color-accent)]"
-            >
-              {copied === "ts-url" ? <Check className="h-3.5 w-3.5 text-[var(--color-accent)]" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-        </div>
+        <EndpointCard
+          title="On this machine"
+          url={path && `${LOCAL_HOST}${path}`}
+          copied={copied === "local-url"}
+          onCopy={() => copy(`${LOCAL_HOST}${path}`, "local-url")}
+        />
+        <EndpointCard
+          title="Over Tailscale"
+          url={path && `${TAILSCALE_HOST}${path}`}
+          copied={copied === "ts-url"}
+          onCopy={() => copy(`${TAILSCALE_HOST}${path}`, "ts-url")}
+        />
       </div>
 
-      {/* Interactive Webhook Test Runner */}
       <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-[var(--color-fg)]">Interactive Test Runner</h2>
-            <p className="text-[11px] text-[var(--color-faint)]">Send a live payload directly to verify ingestion</p>
+            <h2 className="text-sm font-bold text-[var(--color-fg)]">Send a test application</h2>
+            <p className="text-2xs text-[var(--color-faint)]">
+              This writes a real application, so use a company you can recognise and delete.
+            </p>
           </div>
           <button
             onClick={handleSendTest}
             disabled={sending}
-            className="flex items-center gap-1.5 rounded bg-[var(--color-accent)] px-3.5 py-1.5 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 disabled:opacity-50 transition-all"
+            className="flex items-center gap-1.5 rounded bg-[var(--color-accent)] px-3.5 py-1.5 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 disabled:opacity-50 transition-colors shrink-0"
           >
             <Zap className="h-3.5 w-3.5" />
-            {sending ? "Sending..." : "Dispatch Test Webhook"}
+            {sending ? "Sending" : "Send test"}
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          <div>
-            <label className="label block mb-1">Company</label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="block">
+            <span className="mb-1 block text-2xs text-[var(--color-faint)]">Company</span>
             <input
               type="text"
-              value={testCompany}
-              onChange={(e) => setTestCompany(e.target.value)}
-              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-2 text-xs text-[var(--color-fg)] focus:outline-none"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className={inputClass}
             />
-          </div>
-          <div>
-            <label className="label block mb-1">Job Title</label>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-2xs text-[var(--color-faint)]">Job title</span>
             <input
               type="text"
-              value={testTitle}
-              onChange={(e) => setTestTitle(e.target.value)}
-              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-2 text-xs text-[var(--color-fg)] focus:outline-none"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={inputClass}
             />
-          </div>
-          <div>
-            <label className="label block mb-1">Workplace Type</label>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-2xs text-[var(--color-faint)]">Workplace</span>
             <select
-              value={testWorkplace}
-              onChange={(e) => setTestWorkplace(e.target.value)}
-              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-2 text-xs text-[var(--color-fg)] focus:outline-none"
+              value={workplace}
+              onChange={(e) => setWorkplace(e.target.value)}
+              className={inputClass}
             >
-              <option value="remote">remote</option>
-              <option value="hybrid">hybrid</option>
-              <option value="on-site">on-site</option>
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="on-site">On-site</option>
             </select>
-          </div>
+          </label>
         </div>
 
+        {testError && <ErrorBanner message={testError} />}
+
         {testResponse && (
-          <div className="rounded border border-[var(--color-accent)]/30 bg-[var(--color-bg)] p-3 space-y-1">
-            <span className="label text-[9px] text-[var(--color-accent)]">Response Result</span>
-            <pre className="text-[11px] font-mono text-[var(--color-fg)] max-h-40 overflow-y-auto">
+          <div className="rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-3 space-y-1">
+            <span className="text-2xs text-[var(--color-faint)]">What came back</span>
+            <pre className="text-2xs font-mono text-[var(--color-fg)] max-h-40 overflow-y-auto">
               {testResponse}
             </pre>
           </div>
         )}
       </div>
 
-      {/* Code Snippets for Cron Integration */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Python Snippet */}
         <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Code className="h-4 w-4 text-[var(--color-accent)]" />
-              <span className="text-xs font-bold text-[var(--color-fg)]">Python Integration Script</span>
+              <Code className="h-4 w-4 text-[var(--color-muted)]" />
+              <span className="text-xs font-bold text-[var(--color-fg)]">Post from Python</span>
             </div>
-            <button
-              onClick={() => copyToClipboard(pythonSnippet, "py")}
-              className="flex items-center gap-1 text-[11px] text-[var(--color-faint)] hover:text-[var(--color-accent)]"
-            >
-              {copied === "py" ? <Check className="h-3 w-3 text-[var(--color-accent)]" /> : <Copy className="h-3 w-3" />}
-              {copied === "py" ? "Copied" : "Copy Code"}
-            </button>
+            <CopyButton
+              copied={copied === "py"}
+              onCopy={() => copy(PYTHON_SNIPPET, "py")}
+              label="Copy"
+            />
           </div>
-
-          <pre className="rounded bg-[var(--color-bg)] p-3 text-[11px] font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed">
-            {pythonSnippet}
+          <pre className="rounded bg-[var(--color-bg)] p-3 text-2xs font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed">
+            {PYTHON_SNIPPET}
           </pre>
         </div>
 
-        {/* cURL Snippet */}
         <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-[var(--color-accent)]" />
-              <span className="text-xs font-bold text-[var(--color-fg)]">cURL Command Line Example</span>
+              <Terminal className="h-4 w-4 text-[var(--color-muted)]" />
+              <span className="text-xs font-bold text-[var(--color-fg)]">Post from the shell</span>
             </div>
-            <button
-              onClick={() => copyToClipboard(curlSnippet, "curl")}
-              className="flex items-center gap-1 text-[11px] text-[var(--color-faint)] hover:text-[var(--color-accent)]"
-            >
-              {copied === "curl" ? <Check className="h-3 w-3 text-[var(--color-accent)]" /> : <Copy className="h-3 w-3" />}
-              {copied === "curl" ? "Copied" : "Copy cURL"}
-            </button>
+            {info && (
+              <CopyButton
+                copied={copied === "curl"}
+                onCopy={() => copy(info.curl_example, "curl")}
+                label="Copy"
+              />
+            )}
           </div>
-
-          <pre className="rounded bg-[var(--color-bg)] p-3 text-[11px] font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed">
-            {curlSnippet}
+          <pre className="rounded bg-[var(--color-bg)] p-3 text-2xs font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed whitespace-pre-wrap">
+            {info ? info.curl_example : <Skeleton className="h-16 w-full" />}
           </pre>
         </div>
       </div>
+
+      {info && (
+        <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-[var(--color-fg)]">Every field it accepts</span>
+            <CopyButton
+              copied={copied === "payload"}
+              onCopy={() => copy(JSON.stringify(info.sample_payload, null, 2), "payload")}
+              label="Copy"
+            />
+          </div>
+          <pre className="rounded bg-[var(--color-bg)] p-3 text-2xs font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed max-h-72 overflow-y-auto">
+            {JSON.stringify(info.sample_payload, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }

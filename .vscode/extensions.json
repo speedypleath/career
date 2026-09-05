@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "Prisma.prisma",
+    "supabase.vscode-supabase-extension",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss"
+  ]
+}
