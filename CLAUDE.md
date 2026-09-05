@@ -20,7 +20,8 @@ scripts/stop.sh
 ```
 
 `npm run test:classifier` + `npm run build` is the verification pair for any
-classifier change. Additionally, `node scripts/eval-classifier.ts` re-classifies
+classifier change. `npm run build` is also the only type-check gate — `tsconfig`
+sets `noEmit`, so nothing else runs `tsc`. Additionally, `node scripts/eval-classifier.ts` re-classifies
 every stored email and diffs against what is saved — run it before and after
 touching classification rules; `node scripts/debug-classify.ts "<subject fragment>"`
 prints the rule trace for up to 3 matching stored emails.
@@ -46,10 +47,58 @@ npx supabase@latest functions deploy email-classifier-worker
 
 ## Architecture
 
-Next.js 16 App Router, React 19, Tailwind v4, Postgres via `pg`. No ORM, no
-API-client layer, no auth — single user, not meant to be exposed. Route handlers
-call `query()` from `src/lib/db.ts` with raw SQL; the client (`src/app/page.tsx`,
-one `"use client"` shell owning all state) fetches its own `/api/*` routes.
+Next.js 16 App Router, React 19, Tailwind v4, Postgres via `pg` **and** Prisma.
+No auth — single user, not meant to be exposed.
+
+The layers, front to back:
+
+- **Components** are presentational. `src/app/page.tsx` still owns the tab and
+  the selected id, but each view now takes its data from a hook.
+- **`src/hooks/*`** wrap `src/lib/api-client.ts` in `useAsync`, which owns the
+  loading / refreshing / error / reload cycle every view used to hand-roll.
+  `useDashboard` also owns the 15-second poll and the window-focus refetch.
+- **`src/lib/api-client.ts`** is one typed function per endpoint. Components do
+  not call `fetch`. Every route answers `{ error }` on failure, so a rejection
+  carries the server's own message — surface it, don't replace it.
+- **Route handlers** under `src/app/api/**` parse, delegate and return
+  `ok()` / `fail()` from `src/lib/api-response.ts`. They hold no SQL.
+- **`src/lib/repositories/*`** hold the queries. Prisma for ordinary CRUD on the
+  app tables, and `query()` from `src/lib/db.ts` for everything Prisma models
+  badly — the `finalize_email_classification` RPC, pgmq, aggregate stats.
+  `db.ts` is not going away.
+
+### The Prisma boundary
+
+Prisma is a **client only**. `prisma/schema.prisma` is introspected, never
+authored:
+
+- **Never run `prisma migrate`.** `supabase/migrations/*.sql` owns the schema,
+  the RPCs, pgmq and cron. Regenerate with `npm run db:pull`
+  (`prisma db pull && prisma generate`) after a migration lands.
+- The schema models the five app tables only. `email_classification_cache`,
+  `sync_mapping`, `sync_events` and every pgmq table are deliberately absent.
+- **Never import Prisma, `pg`, or anything from `src/lib/db.ts` into
+  `supabase/functions/_shared/`** — that directory is type-checked by
+  `npm run build` and also loaded by Deno.
+
+### Pure email logic
+
+`src/lib/email/` holds the logic that used to be unreachable from the test
+runner because `email-scanner.ts` imported `./db`:
+
+| Module | Owns |
+|---|---|
+| `extract.ts` | `extractCompanyName`, `extractJobTitle`, `sanitizeCompany`, `isAtsSender` |
+| `mime.ts` | `htmlToText`, `looksLikeHtmlBody`, `normalizeBodyString`, `extractBodyFromGmailPayload` |
+| `matching.ts` | `findBestMatchingApplication` |
+| `status.ts` | `STATUS_RANK`, `shouldAdvanceStatus`, `statusForClassification`, `BLACKLISTED_COMPANY_NAMES` |
+| `gog.ts` | `searchMessages`, `hydrateBodies` — the only module that shells out |
+
+None of these import `db.ts`, and imports between them use explicit `.ts`
+extensions so `node --test` can resolve them. **The extraction heuristics in
+`extract.ts` are known to be wrong** in the cases `tests/email-extract.test.ts`
+marks `KNOWN BAD` — those assertions encode current behaviour on purpose. Fix
+the heuristic and the test together, never the expectation alone.
 
 ### The classification cascade
 
@@ -119,6 +168,12 @@ be edited together:
 
 ### Schema and migrations
 
+RLS is enabled on `applications`, `application_events` and `email_logs` with
+**no policies** (migration `202609040004`), which locks out the anon and
+authenticated roles. The app is unaffected: it connects as the table owner over
+direct Postgres, and owners bypass RLS unless `FORCE ROW LEVEL SECURITY` is set.
+Adding a policy there would grant access, not restrict it.
+
 `src/lib/schema.sql` is the source of truth for the app tables and is safe to
 re-run (`CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
 `supabase/migrations/*.sql` layer the queue, RPCs, cron and guardrails on top —
@@ -134,14 +189,13 @@ dropped that write when it replaced the function.
 
 ### Known drift
 
-- `docs/email-classifier.md` describes the cascade but its numbers are stale:
-  it says 1,100 input tokens (actual `MAX_MODEL_INPUT_TOKENS` = 1,500), 3 output
-  tokens (actual `MAX_MODEL_OUTPUT_TOKENS` = 16) and digits `0`–`6` (actual
-  `0`–`7`, since `conference` was added). Trust the constants.
-- The single user's Gmail address is hardcoded as a fallback in ~8 places
-  (a classifier gate for outbound mail, the scanner's account default, the scan
-  route's default recipient, `SettingsView`, `schema.sql`, migration seeds).
-  There is no config knob for it; grep before assuming one edit is enough.
+- The single user's Gmail address has a TypeScript home now — `OWNER_EMAIL` in
+  `src/lib/owner.ts` — but the SQL half does not. `src/lib/schema.sql` and two
+  migration seeds still carry the literal, and so does the local-part entry in
+  `BLACKLISTED_COMPANY_NAMES` (`src/lib/email/status.ts`), which has to keep
+  mirroring the RPC's inline list character for character. Changing the address
+  means editing `owner.ts` *and* writing a migration. It is a fallback either
+  way: `email_settings.gmail_account` wins whenever a row exists.
 
 ## Conventions
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { query } from "./db"
+import { OWNER_EMAIL } from "./owner"
 import { classifyEmailDetailed } from "./email-classifier"
 import type { EmailClassification } from "./email-classifier"
 import {
@@ -60,7 +61,7 @@ export async function scanEmails(): Promise<ScanResult> {
 
     // 3. Scan via the gog CLI. Transport failures come back in errors[] rather
     // than thrown, so "blocked" stays distinguishable from "no mail".
-    const gogAccount = settings?.gmail_account || "gheorgheandrei13@gmail.com"
+    const gogAccount = settings?.gmail_account || OWNER_EMAIL
     const { messages: gogMessages, errors: searchErrors } = await searchMessages(gogAccount)
     result.errors.push(...searchErrors)
 
