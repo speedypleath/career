@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { X, Plus, Sparkles, Building, Briefcase, Globe, Mail, DollarSign, FileText, Send } from "lucide-react"
+import { createApplication } from "@/lib/api-client"
 import type { WorkplaceType, ApplicationStatus, ApplicationMethod, PriorityLevel } from "@/types"
 
 interface AddApplicationModalProps {
@@ -43,33 +44,24 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
     setError(null)
 
     try {
-      const res = await fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          company: company.trim(),
-          workplace_type: workplaceType,
-          status,
-          application_method: applicationMethod,
-          location: location.trim(),
-          url: url.trim(),
-          salary: salary.trim(),
-          contact_email: contactEmail.trim(),
-          contact_name: contactName.trim(),
-          priority,
-          job_description: jobDescription.trim(),
-          info_provided: infoProvided.trim(),
-          cover_letter: coverLetter.trim(),
-          notes: notes.trim(),
-          applied_at: new Date().toISOString(),
-        }),
+      await createApplication({
+        title: title.trim(),
+        company: company.trim(),
+        workplace_type: workplaceType,
+        status,
+        application_method: applicationMethod,
+        location: location.trim(),
+        url: url.trim(),
+        salary: salary.trim(),
+        contact_email: contactEmail.trim(),
+        contact_name: contactName.trim(),
+        priority,
+        job_description: jobDescription.trim(),
+        info_provided: infoProvided.trim(),
+        cover_letter: coverLetter.trim(),
+        notes: notes.trim(),
+        applied_at: new Date().toISOString(),
       })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Failed to create application")
-      }
 
       onCreated()
       onClose()

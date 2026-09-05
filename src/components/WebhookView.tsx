@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { StatusDot } from "./StatusDot"
 import { cx } from "./format"
+import { postWebhookApplication } from "@/lib/api-client"
 
 export function WebhookView() {
   const [copied, setCopied] = useState<string | null>(null)
@@ -56,13 +57,7 @@ export function WebhookView() {
         source: "audio-job-hunter-cron",
       }
 
-      const res = await fetch("/api/webhook/application", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
+      const data = await postWebhookApplication(payload)
       setTestResponse(JSON.stringify(data, null, 2))
     } catch (err) {
       setTestResponse(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2))

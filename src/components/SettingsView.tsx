@@ -15,72 +15,57 @@ import {
   Sparkles
 } from "lucide-react"
 import { StatusDot } from "./StatusDot"
-import type { EmailSettings } from "@/types"
+import { ErrorBanner } from "./ErrorBanner"
+import { updateEmailSettings } from "@/lib/api-client"
+import { useEmailSettings } from "@/hooks/useEmailSettings"
+import { OWNER_EMAIL } from "@/lib/owner"
 
 export function SettingsView() {
-  const [settings, setSettings] = useState<EmailSettings | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: settings, loading, error, reload, setError } = useEmailSettings()
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  const [gmailAccount, setGmailAccount] = useState("owner@example.com")
+  const [gmailAccount, setGmailAccount] = useState(OWNER_EMAIL)
   const [imapHost, setImapHost] = useState("imap.gmail.com")
   const [imapPort, setImapPort] = useState(993)
-  const [imapUser, setImapUser] = useState("owner@example.com")
+  const [imapUser, setImapUser] = useState(OWNER_EMAIL)
   const [imapPassword, setImapPassword] = useState("")
   const [autoSync, setAutoSync] = useState(true)
   const [syncInterval, setSyncInterval] = useState(60)
 
-  async function loadSettings() {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/email/settings")
-      const data = await res.json()
-      if (data.settings) {
-        setSettings(data.settings)
-        setGmailAccount(data.settings.gmail_account || "owner@example.com")
-        setImapHost(data.settings.imap_host || "imap.gmail.com")
-        setImapPort(data.settings.imap_port || 993)
-        setImapUser(data.settings.imap_user || "owner@example.com")
-        setAutoSync(data.settings.auto_sync ?? true)
-        setSyncInterval(data.settings.sync_interval_mins || 60)
-      }
-    } catch (err) {
-      console.error("Failed to load settings:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // The form is uncontrolled by the fetch: it seeds itself once the settings
+  // arrive, then belongs to whoever is typing.
   useEffect(() => {
-    loadSettings()
-  }, [])
+    if (!settings) return
+    setGmailAccount(settings.gmail_account || OWNER_EMAIL)
+    setImapHost(settings.imap_host || "imap.gmail.com")
+    setImapPort(settings.imap_port || 993)
+    setImapUser(settings.imap_user || OWNER_EMAIL)
+    setAutoSync(settings.auto_sync ?? true)
+    setSyncInterval(settings.sync_interval_mins || 60)
+  }, [settings])
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     setSaveSuccess(false)
+    setError(null)
     try {
-      const res = await fetch("/api/email/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gmail_account: gmailAccount,
-          imap_host: imapHost,
-          imap_port: imapPort,
-          imap_user: imapUser,
-          imap_password: imapPassword || undefined,
-          auto_sync: autoSync,
-          sync_interval_mins: syncInterval,
-        }),
+      await updateEmailSettings({
+        gmail_account: gmailAccount,
+        imap_host: imapHost,
+        imap_port: imapPort,
+        imap_user: imapUser,
+        // An empty box means "leave the stored password alone", not "clear it".
+        imap_password: imapPassword || undefined,
+        auto_sync: autoSync,
+        sync_interval_mins: syncInterval,
       })
-      if (res.ok) {
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 3000)
-        loadSettings()
-      }
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+      reload(true)
     } catch (err) {
-      console.error("Failed to save settings:", err)
+      setError(err instanceof Error ? err.message : "Could not save your settings")
     } finally {
       setSaving(false)
     }
@@ -88,6 +73,8 @@ export function SettingsView() {
 
   return (
     <div className="max-w-4xl space-y-6">
+      {error && <ErrorBanner message={error} retry={() => reload(false)} />}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
