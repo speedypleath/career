@@ -32,6 +32,233 @@ export interface ScanResult {
   errors: string[]
 }
 
+/**
+ * Everything one message contributes to a decision. Built once per message in
+ * the loop below, then handed to whichever handler that message's branch picks.
+ *
+ * `matchedApp` is mutable because handleNewEmail may create the application it
+ * then links the log to.
+ */
+interface Candidate {
+  messageId: string
+  sender: string
+  subject: string
+  body: string
+  snippet: string
+  verdict: Awaited<ReturnType<typeof classifyEmailDetailed>>
+  classification: EmailClassification
+  company: string
+  role: string
+  matchedApp: Application | null
+  existing: (EmailLog & { manual_override: boolean }) | null
+}
+
+/** The scan's own state, shared across every message in one run. */
+interface ScanState {
+  applications: Application[]
+  /** The mailbox that was scanned; stored as each log's recipient. */
+  recipient: string
+  maxQueued: number
+  result: ScanResult
+}
+
+/**
+ * Ambiguous mail: persist it as pending and hand it to the queue.
+ *
+ * Returns true when the message is fully dealt with — either it was already
+ * logged, or the job is on the queue. Returns false when the enqueue failed,
+ * which drops the message through to the deterministic branches below so it
+ * still gets a conservative answer instead of being stranded.
+ */
+async function handleQueuedFallback(state: ScanState, c: Candidate): Promise<boolean> {
+  // At-least-once queue delivery plus the unique message id make rescans
+  // idempotent. A pending or resolved row must not enqueue a second paid
+  // inference request.
+  if (c.existing) return true
+
+  const emailLogId = randomUUID()
+  const job = buildClassificationJob(
+    { subject: c.subject, body: c.body, sender: c.sender },
+    {
+      emailLogId,
+      messageId: c.messageId,
+      applicationId: c.matchedApp?.id ?? null,
+      sender: c.sender,
+      subject: c.subject,
+      company: c.company,
+      role: c.role,
+      snippet: c.snippet,
+    },
+  )
+
+  const pendingRes = await query<EmailLog>(
+    `INSERT INTO email_logs (
+       id, application_id, message_id, sender, recipient, subject, snippet, body,
+       classification, classification_state, classification_source,
+       classifier_prompt_hash, classifier_prompt_tokens, received_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', 'queue', $10, $11, NOW())
+     RETURNING *`,
+    [
+      emailLogId,
+      c.matchedApp?.id ?? null,
+      c.messageId,
+      c.sender,
+      state.recipient,
+      c.subject,
+      c.snippet,
+      c.body,
+      c.classification,
+      job.promptHash,
+      job.estimatedInputTokens,
+    ],
+  )
+
+  try {
+    await enqueueClassificationJob(job)
+    state.result.queuedCount++
+    state.result.newEmails.push(pendingRes.rows[0])
+    return true
+  } catch (error) {
+    // Remove the just-created pending row so the conservative fallback can
+    // complete normally instead of leaving a stuck job.
+    await query(`DELETE FROM email_logs WHERE id = $1 AND classification_state = 'pending'`, [emailLogId])
+    state.result.errors.push(
+      `Could not enqueue ${c.messageId}; used deterministic fallback: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return false
+  }
+}
+
+/** Mail that belongs to no application: logged, unlinked, never advancing anything. */
+async function handleSkipped(state: ScanState, c: Candidate): Promise<void> {
+  state.result.skippedCount++
+
+  if (!c.existing) {
+    const logRes = await query<EmailLog>(
+      `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, classification_state, classification_source, received_at)
+       VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, 'resolved', $8, NOW())
+       RETURNING *`,
+      [c.messageId, c.sender, state.recipient, c.subject, c.snippet, c.body, c.classification, c.verdict.source],
+    )
+    state.result.newEmails.push(logRes.rows[0])
+    return
+  }
+
+  const existingRow = c.existing
+  if (
+    !existingRow.manual_override &&
+    (existingRow.classification !== c.classification || existingRow.application_id !== null)
+  ) {
+    await query(
+      `UPDATE email_logs SET classification = $1, application_id = NULL, classification_state = 'resolved', classification_source = $2 WHERE id = $3`,
+      [c.classification, c.verdict.source, existingRow.id],
+    )
+  }
+}
+
+/** First sighting: link it, create the application if there is one to create, advance status. */
+async function handleNewEmail(state: ScanState, c: Candidate): Promise<void> {
+  // Auto-create an application ONLY when we have a valid, non-blacklisted company name
+  const canCreateApp =
+    c.company !== "Unknown Company" && !BLACKLISTED_COMPANY_NAMES.has(c.company.toLowerCase())
+
+  if (!c.matchedApp && canCreateApp) {
+    const initStatus = statusForClassification(c.classification) ?? "applied"
+
+    const newAppRes = await query<Application>(
+      `INSERT INTO applications (title, company, workplace_type, status, application_method, contact_email, notes, priority, source, applied_at, created_at, updated_at)
+       VALUES ($1, $2, 'remote', $3, 'email', $4, $5, 'medium', 'email_scanner', NOW(), NOW(), NOW())
+       RETURNING *`,
+      [c.role, c.company, initStatus, isAtsSender(c.sender) ? "" : c.sender, `Auto-detected from email: "${c.subject}"`],
+    )
+    const newApp = newAppRes.rows[0]
+    c.matchedApp = newApp
+    state.applications.push(newApp)
+
+    await query(
+      `INSERT INTO application_events (application_id, event_type, title, description)
+       VALUES ($1, 'email_created', 'Application Auto-Detected', $2)`,
+      [newApp.id, `Created application for ${c.role} at ${c.company} from email: "${c.subject}"`],
+    )
+  }
+
+  const matchedAppId = c.matchedApp?.id ?? null
+
+  const logRes = await query<EmailLog>(
+    `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, received_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+     RETURNING *`,
+    [matchedAppId, c.messageId, c.sender, state.recipient, c.subject, c.snippet, c.body, c.classification],
+  )
+
+  state.result.newEmails.push(logRes.rows[0])
+
+  if (!matchedAppId) return
+
+  state.result.matchedCount++
+
+  // A "question" is the one case that depends on where the application already
+  // stands: being asked for details while merely "applied" means somebody is
+  // actually looking at it.
+  const newStatus =
+    c.classification === "question"
+      ? c.matchedApp?.status === "applied"
+        ? ("interview_pending" as ApplicationStatus)
+        : null
+      : statusForClassification(c.classification)
+
+  if (newStatus && shouldAdvanceStatus(c.matchedApp?.status, newStatus)) {
+    await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, matchedAppId])
+    if (c.matchedApp) c.matchedApp.status = newStatus
+  }
+
+  await query(
+    `INSERT INTO application_events (application_id, event_type, title, description, metadata)
+     VALUES ($1, 'email_received', $2, $3, $4)`,
+    [
+      matchedAppId,
+      `Email received: ${c.classification.toUpperCase()}`,
+      `Subject: "${c.subject}" from ${c.sender}`,
+      JSON.stringify({ messageId: c.messageId, classification: c.classification, snippet: c.snippet }),
+    ],
+  )
+}
+
+/**
+ * Already logged: re-run the classifier over it, but never overwrite a human
+ * correction — that is the whole point of manual_override.
+ */
+async function handleExistingEmail(state: ScanState, c: Candidate): Promise<void> {
+  const existingRow = c.existing!
+  const locked = existingRow.manual_override === true
+  const effectiveClass = locked ? existingRow.classification : c.classification
+
+  const needUpdateClass = !locked && existingRow.classification !== c.classification
+  const needUpdateApp = !existingRow.application_id && !!c.matchedApp
+
+  if (!needUpdateClass && !needUpdateApp) return
+
+  const finalAppId = c.matchedApp?.id ?? existingRow.application_id
+  await query(
+    `UPDATE email_logs SET classification = $1, application_id = $2, body = COALESCE(NULLIF($3, ''), body) WHERE id = $4`,
+    [effectiveClass, finalAppId, c.body, existingRow.id],
+  )
+
+  if (!finalAppId) return
+
+  const app = state.applications.find((a) => a.id === finalAppId)
+  const newStatus = statusForClassification(effectiveClass as EmailClassification)
+  if (newStatus && shouldAdvanceStatus(app?.status, newStatus)) {
+    await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, finalAppId])
+    if (app) app.status = newStatus
+  }
+}
+
+/**
+ * One pass over the mailbox. The branch order below is load-bearing: queued
+ * fallback first, then the classifications that belong to no application, then
+ * first sightings, then rescans.
+ */
 export async function scanEmails(): Promise<ScanResult> {
   const result: ScanResult = {
     source: "local-scanner",
@@ -70,10 +297,16 @@ export async function scanEmails(): Promise<ScanResult> {
 
     // 4. Deterministic decisions are applied immediately. Ambiguous messages
     // are persisted as pending and queued for the Supabase Edge Function.
-    const maxQueued = Math.max(
-      0,
-      Number(process.env.EMAIL_CLASSIFIER_MAX_CALLS_PER_SCAN ?? MAX_QUEUED_CLASSIFICATIONS_PER_SCAN),
-    )
+    const state: ScanState = {
+      applications,
+      recipient: settings?.gmail_account || "",
+      maxQueued: Math.max(
+        0,
+        Number(process.env.EMAIL_CLASSIFIER_MAX_CALLS_PER_SCAN ?? MAX_QUEUED_CLASSIFICATIONS_PER_SCAN),
+      ),
+      result,
+    }
+
     for (const msg of gogMessages) {
       result.scannedCount++
       const messageId = msg.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -84,201 +317,46 @@ export async function scanEmails(): Promise<ScanResult> {
       const verdict = await classifyEmailDetailed({ subject, body, sender })
       const classification = verdict.classification
 
-      const extractedCompany = extractCompanyName(subject, sender, body)
-      const extractedRole = extractJobTitle(subject, body)
+      const company = extractCompanyName(subject, sender, body)
+      const role = extractJobTitle(subject, body)
 
-      // Intelligent match to existing applications
-      let matchedApp = findBestMatchingApplication(applications, {
-        company: extractedCompany,
-        role: extractedRole,
+      const existing = await query<EmailLog & { manual_override: boolean }>(
+        `SELECT id, classification, application_id, manual_override, classification_state FROM email_logs WHERE message_id = $1`,
+        [messageId],
+      )
+
+      const candidate: Candidate = {
+        messageId,
         sender,
         subject,
         body,
         snippet,
-      })
+        verdict,
+        classification,
+        company,
+        role,
+        matchedApp: findBestMatchingApplication(applications, {
+          company,
+          role,
+          sender,
+          subject,
+          body,
+          snippet,
+        }),
+        existing: existing.rows[0] ?? null,
+      }
 
-      let matchedAppId = matchedApp ? matchedApp.id : null
-
-      // Check if already in email_logs
-      const existing = await query<EmailLog & { manual_override: boolean }>(
-        `SELECT id, classification, application_id, manual_override, classification_state FROM email_logs WHERE message_id = $1`,
-        [messageId]
-      )
-
-      if (verdict.source === "fallback" && result.queuedCount < maxQueued) {
-        if (existing.rows.length > 0) {
-          // At-least-once queue delivery plus the unique message id make
-          // rescans idempotent. A pending or resolved row must not enqueue a
-          // second paid inference request.
-          continue
-        }
-
-        const emailLogId = randomUUID()
-        const job = buildClassificationJob(
-          { subject, body, sender },
-          {
-            emailLogId,
-            messageId,
-            applicationId: matchedAppId,
-            sender,
-            subject,
-            company: extractedCompany,
-            role: extractedRole,
-            snippet,
-          },
-        )
-
-        const pendingRes = await query<EmailLog>(
-          `INSERT INTO email_logs (
-             id, application_id, message_id, sender, recipient, subject, snippet, body,
-             classification, classification_state, classification_source,
-             classifier_prompt_hash, classifier_prompt_tokens, received_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', 'queue', $10, $11, NOW())
-           RETURNING *`,
-          [
-            emailLogId,
-            matchedAppId,
-            messageId,
-            sender,
-            settings?.gmail_account || "",
-            subject,
-            snippet,
-            body,
-            classification,
-            job.promptHash,
-            job.estimatedInputTokens,
-          ],
-        )
-
-        try {
-          await enqueueClassificationJob(job)
-          result.queuedCount++
-          result.newEmails.push(pendingRes.rows[0])
-          continue
-        } catch (error) {
-          // Remove the just-created pending row so the conservative fallback
-          // below can complete normally instead of leaving a stuck job.
-          await query(`DELETE FROM email_logs WHERE id = $1 AND classification_state = 'pending'`, [emailLogId])
-          result.errors.push(
-            `Could not enqueue ${messageId}; used deterministic fallback: ${error instanceof Error ? error.message : String(error)}`,
-          )
-        }
+      if (verdict.source === "fallback" && result.queuedCount < state.maxQueued) {
+        if (await handleQueuedFallback(state, candidate)) continue
       }
 
       if (classification === "unrelated" || classification === "conference") {
-        result.skippedCount++
-        if (existing.rows.length === 0) {
-          const logRes = await query<EmailLog>(
-            `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, classification_state, classification_source, received_at)
-             VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, 'resolved', $8, NOW())
-             RETURNING *`,
-            [messageId, sender, settings?.gmail_account || "", subject, snippet, body, classification, verdict.source]
-          )
-          result.newEmails.push(logRes.rows[0])
-        } else {
-          const existingRow = existing.rows[0]
-          if (!existingRow.manual_override && (existingRow.classification !== classification || existingRow.application_id !== null)) {
-            await query(
-              `UPDATE email_logs SET classification = $1, application_id = NULL, classification_state = 'resolved', classification_source = $2 WHERE id = $3`,
-              [classification, verdict.source, existingRow.id]
-            )
-          }
-        }
+        await handleSkipped(state, candidate)
         continue
       }
 
-      if (existing.rows.length === 0) {
-        // Auto-create an application ONLY when we have a valid, non-blacklisted company name
-        const canCreateApp = extractedCompany !== "Unknown Company" && !BLACKLISTED_COMPANY_NAMES.has(extractedCompany.toLowerCase())
-
-        if (!matchedAppId && canCreateApp) {
-          const initStatus = statusForClassification(classification) ?? "applied"
-
-          const newAppRes = await query<Application>(
-            `INSERT INTO applications (title, company, workplace_type, status, application_method, contact_email, notes, priority, source, applied_at, created_at, updated_at)
-             VALUES ($1, $2, 'remote', $3, 'email', $4, $5, 'medium', 'email_scanner', NOW(), NOW(), NOW())
-             RETURNING *`,
-            [extractedRole, extractedCompany, initStatus, isAtsSender(sender) ? "" : sender, `Auto-detected from email: "${subject}"`]
-          )
-          const newApp = newAppRes.rows[0]
-          matchedApp = newApp
-          matchedAppId = newApp.id
-          applications.push(newApp)
-
-          await query(
-            `INSERT INTO application_events (application_id, event_type, title, description)
-             VALUES ($1, 'email_created', 'Application Auto-Detected', $2)`,
-            [matchedAppId, `Created application for ${extractedRole} at ${extractedCompany} from email: "${subject}"`]
-          )
-        }
-
-        const logRes = await query<EmailLog>(
-          `INSERT INTO email_logs (application_id, message_id, sender, recipient, subject, snippet, body, classification, received_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-           RETURNING *`,
-          [matchedAppId, messageId, sender, settings?.gmail_account || "", subject, snippet, body, classification]
-        )
-
-        const logged = logRes.rows[0]
-        result.newEmails.push(logged)
-
-        if (matchedAppId) {
-          result.matchedCount++
-
-          // A "question" is the one case that depends on where the application
-          // already stands: being asked for details while merely "applied"
-          // means somebody is actually looking at it.
-          const newStatus =
-            classification === "question"
-              ? matchedApp?.status === "applied"
-                ? ("interview_pending" as ApplicationStatus)
-                : null
-              : statusForClassification(classification)
-
-          if (newStatus && shouldAdvanceStatus(matchedApp?.status, newStatus)) {
-            await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, matchedAppId])
-            if (matchedApp) matchedApp.status = newStatus
-          }
-
-          // Add event to application timeline
-          await query(
-            `INSERT INTO application_events (application_id, event_type, title, description, metadata)
-             VALUES ($1, 'email_received', $2, $3, $4)`,
-            [
-              matchedAppId,
-              `Email received: ${classification.toUpperCase()}`,
-              `Subject: "${subject}" from ${sender}`,
-              JSON.stringify({ messageId, classification, snippet }),
-            ]
-          )
-        }
-      } else {
-        // Already logged: re-run the classifier over it, but never overwrite a
-        // human correction — that is the whole point of manual_override.
-        const existingRow = existing.rows[0]
-        const locked = existingRow.manual_override === true
-        const effectiveClass = locked ? existingRow.classification : classification
-
-        const needUpdateClass = !locked && existingRow.classification !== classification
-        const needUpdateApp = !existingRow.application_id && !!matchedAppId
-
-        if (needUpdateClass || needUpdateApp) {
-          const finalAppId = matchedAppId || existingRow.application_id
-          await query(
-            `UPDATE email_logs SET classification = $1, application_id = $2, body = COALESCE(NULLIF($3, ''), body) WHERE id = $4`,
-            [effectiveClass, finalAppId, body, existingRow.id]
-          )
-
-          if (finalAppId) {
-            const app = applications.find((a) => a.id === finalAppId)
-            const newStatus = statusForClassification(effectiveClass as EmailClassification)
-            if (newStatus && shouldAdvanceStatus(app?.status, newStatus)) {
-              await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, finalAppId])
-              if (app) app.status = newStatus
-            }
-          }
-        }
-      }
+      if (!candidate.existing) await handleNewEmail(state, candidate)
+      else await handleExistingEmail(state, candidate)
     }
 
     // Update last_synced_at
