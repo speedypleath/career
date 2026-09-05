@@ -9,6 +9,7 @@ meant to be exposed publicly.
 
 - [Stack](#stack)
 - [Running it](#running-it)
+- [Deploying](#deploying)
 - [Data model](#data-model)
 - [Email Radar](#email-radar)
 - [HTTP API](#http-api)
@@ -66,6 +67,14 @@ gog auth login          # or: gog auth add <email>
 The account defaults to the one stored in `email_settings`; when the token
 expires the scan does not fail silently — the API returns the re-auth
 instruction in `errors[]` and the UI shows it in a banner.
+
+## Deploying
+
+`main` is deployed automatically by `.github/workflows/deploy.yml` — `verify`
+(lint, build type-gate, tests) on every PR, then `supabase` (migrations, edge
+function, Cloudflare secrets) and `deploy` (Tailscale + SSH redeploy on the Mac
+mini) on every push to `main`. Setup, first run, and rollback are in
+[`docs/deploy.md`](docs/deploy.md).
 
 ## Data model
 
