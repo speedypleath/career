@@ -1,184 +1,124 @@
-import { NextResponse } from "next/server"
 import { randomUUID } from "node:crypto"
-import { scanEmails, classifyEmailDetailed } from "@/lib/email-scanner"
+import { badRequest, handle, ok } from "@/lib/api-response"
+import { classifyEmailDetailed, scanEmails } from "@/lib/email-scanner"
 import { buildClassificationJob, enqueueClassificationJob } from "@/lib/email-classification-queue"
-import { query } from "@/lib/db"
-import type { EmailLog, Application } from "@/types"
+import { shouldAdvanceStatus, statusForClassification } from "@/lib/email/status"
+import { OWNER_EMAIL } from "@/lib/owner"
+import { findAllForMatching, findBasics, matchByCompanyMention, setStatus } from "@/lib/repositories/applications"
+import { markQueueFailed, upsertScanned } from "@/lib/repositories/email-logs"
+import { append } from "@/lib/repositories/events"
 
-export async function GET() {
-  try {
-    const result = await scanEmails()
-    return NextResponse.json({
-      success: true,
-      message: `Scan finished. Scanned: ${result.scannedCount}, Matched: ${result.matchedCount}, Queued: ${result.queuedCount}, Skipped: ${result.skippedCount}, New logged: ${result.newEmails.length}`,
-      ...result,
-    })
-  } catch (error) {
-    console.error("Email scan failed:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal Server Error" },
-      { status: 500 }
-    )
-  }
-}
+export const GET = handle("Email scan failed", async () => {
+  const result = await scanEmails()
+  return ok({
+    success: true,
+    message: `Scan finished. Scanned: ${result.scannedCount}, Matched: ${result.matchedCount}, Queued: ${result.queuedCount}, Skipped: ${result.skippedCount}, New logged: ${result.newEmails.length}`,
+    ...result,
+  })
+})
 
-// Ingest or test a single email message
-export async function POST(request: Request) {
-  try {
-    const body = await request.json()
-    const {
-      sender,
-      recipient = "owner@example.com",
-      subject,
-      body: emailBody = "",
-      snippet = "",
-      application_id,
-      received_at = new Date().toISOString(),
-    } = body
+const SNIPPET_CHARS = 300
 
-    if (!sender || !subject) {
-      return NextResponse.json(
-        { error: "Both 'sender' and 'subject' are required" },
-        { status: 400 }
+/** Ingest or test a single email message. */
+export const POST = handle("Failed to ingest email", async (request: Request) => {
+  const body = await request.json()
+  const {
+    sender,
+    recipient = OWNER_EMAIL,
+    subject,
+    body: emailBody = "",
+    snippet = "",
+    application_id,
+    received_at = new Date().toISOString(),
+  } = body
+
+  if (!sender || !subject) return badRequest("Both 'sender' and 'subject' are required")
+
+  const fullContent = snippet || emailBody
+  const messageId =
+    body.message_id || `manual-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+
+  const matched = application_id
+    ? await findBasics(application_id)
+    : matchByCompanyMention(await findAllForMatching(), sender, subject, fullContent)
+
+  // An explicitly supplied application_id is honoured even when no row matches
+  // it, which is what the original code did by keeping the id and a null row.
+  const matchedAppId = application_id || matched?.id || null
+
+  const verdict = body.classification
+    ? null
+    : await classifyEmailDetailed({ subject, body: emailBody || fullContent, sender })
+  const classification = body.classification || verdict?.classification || "unrelated"
+  const queued = verdict?.source === "fallback"
+  const emailLogId = randomUUID()
+
+  const job = queued
+    ? buildClassificationJob(
+        { subject, body: emailBody || fullContent, sender },
+        {
+          emailLogId,
+          messageId,
+          applicationId: matchedAppId,
+          sender,
+          subject,
+          company: matched?.company || "Unknown Company",
+          role: matched?.title || "Unknown Role",
+          snippet: fullContent.slice(0, SNIPPET_CHARS),
+        },
       )
-    }
+    : null
 
-    const fullContent = snippet || emailBody
-    const messageId = body.message_id || `manual-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+  const savedEmail = await upsertScanned({
+    id: emailLogId,
+    applicationId: matchedAppId,
+    messageId,
+    sender,
+    recipient,
+    subject,
+    snippet: fullContent.slice(0, SNIPPET_CHARS),
+    body: emailBody,
+    classification,
+    state: queued ? "pending" : "resolved",
+    source: queued ? "queue" : body.classification ? "manual" : verdict?.source || "fallback",
+    promptHash: job?.promptHash || null,
+    promptTokens: job?.estimatedInputTokens || null,
+    receivedAt: received_at,
+  })
 
-    // Determine application id if not explicitly passed
-    let matchedAppId = application_id || null
-    let matchedApp: Pick<Application, "id" | "company" | "title"> | null = null
-    if (!matchedAppId) {
-      const apps = await query<Application>(`SELECT id, company, title FROM applications`)
-      for (const app of apps.rows) {
-        const cLower = app.company.toLowerCase()
-        if (
-          sender.toLowerCase().includes(cLower) ||
-          subject.toLowerCase().includes(cLower) ||
-          fullContent.toLowerCase().includes(cLower)
-        ) {
-          matchedAppId = app.id
-          matchedApp = app
-          break
-        }
-      }
-    } else {
-      const app = await query<Application>(`SELECT id, company, title FROM applications WHERE id = $1`, [matchedAppId])
-      matchedApp = app.rows[0] || null
-    }
-
-    const verdict = body.classification
-      ? null
-      : await classifyEmailDetailed({ subject, body: emailBody || fullContent, sender })
-    const classification = body.classification || verdict?.classification || "unrelated"
-    const queued = verdict?.source === "fallback"
-    const emailLogId = randomUUID()
-    const job = queued
-      ? buildClassificationJob(
-          { subject, body: emailBody || fullContent, sender },
-          {
-            emailLogId,
-            messageId,
-            applicationId: matchedAppId,
-            sender,
-            subject,
-            company: matchedApp?.company || "Unknown Company",
-            role: matchedApp?.title || "Unknown Role",
-            snippet: fullContent.slice(0, 300),
-          },
-        )
-      : null
-
-    const insertRes = await query<EmailLog>(
-      `INSERT INTO email_logs (
-         id, application_id, message_id, sender, recipient, subject, snippet, body,
-         classification, classification_state, classification_source,
-         classifier_prompt_hash, classifier_prompt_tokens, received_at
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       ON CONFLICT (message_id) DO UPDATE SET
-         application_id = COALESCE($2, email_logs.application_id),
-         classification = CASE WHEN email_logs.manual_override THEN email_logs.classification ELSE $9 END,
-         classification_state = CASE WHEN email_logs.manual_override THEN email_logs.classification_state ELSE $10 END,
-         classification_source = CASE WHEN email_logs.manual_override THEN email_logs.classification_source ELSE $11 END,
-         classifier_prompt_hash = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_hash ELSE $12 END,
-         classifier_prompt_tokens = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_tokens ELSE $13 END
-       RETURNING *`,
-      [
-        emailLogId,
-        matchedAppId,
-        messageId,
-        sender,
-        recipient,
-        subject,
-        fullContent.slice(0, 300),
-        emailBody,
-        classification,
-        queued ? "pending" : "resolved",
-        queued ? "queue" : body.classification ? "manual" : verdict?.source || "fallback",
-        job?.promptHash || null,
-        job?.estimatedInputTokens || null,
-        received_at,
-      ]
-    )
-
-    const savedEmail = insertRes.rows[0]
-
-    if (job) {
-      try {
-        await enqueueClassificationJob({ ...job, emailLogId: savedEmail.id })
-      } catch (error) {
-        await query(
-          `UPDATE email_logs
-           SET classification_state = 'failed', classification_source = 'fallback', classification_error = $1
-           WHERE id = $2`,
-          [error instanceof Error ? error.message.slice(0, 500) : "Queue unavailable", savedEmail.id],
-        )
-        throw error
-      }
-
-      return NextResponse.json({
-        success: true,
-        queued: true,
-        email: savedEmail,
-        matchedApplicationId: matchedAppId,
-      }, { status: 202 })
-    }
-
-    // If matched, log event and optionally update status
-    if (matchedAppId) {
-      let newStatus: string | null = null
-      if (classification === "interview") newStatus = "interviewing"
-      else if (classification === "offer") newStatus = "offer"
-      else if (classification === "rejection") newStatus = "rejected"
-
-      if (newStatus) {
-        await query(`UPDATE applications SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, matchedAppId])
-      }
-
-      await query(
-        `INSERT INTO application_events (application_id, event_type, title, description, metadata)
-         VALUES ($1, 'email_received', $2, $3, $4)`,
-        [
-          matchedAppId,
-          `Email: ${classification.toUpperCase()}`,
-          `Subject: "${subject}" from ${sender}`,
-          JSON.stringify({ messageId, classification, subject, sender }),
-        ]
+  if (job) {
+    try {
+      await enqueueClassificationJob({ ...job, emailLogId: savedEmail.id })
+    } catch (error) {
+      // Leaving the row 'pending' with nothing to process it would strand it.
+      await markQueueFailed(
+        savedEmail.id,
+        error instanceof Error ? error.message : "Queue unavailable",
       )
+      throw error
     }
 
-    return NextResponse.json({
-      success: true,
-      email: savedEmail,
-      matchedApplicationId: matchedAppId,
-    })
-  } catch (error) {
-    console.error("Failed to ingest email:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal Server Error" },
-      { status: 500 }
-    )
+    return ok({ success: true, queued: true, email: savedEmail, matchedApplicationId: matchedAppId }, 202)
   }
-}
+
+  if (matchedAppId) {
+    // This route used to carry its own copy of the rule: three classifications
+    // instead of five, and no rank check, so ingesting an interview notice
+    // after an offer rewound the application to "interviewing". It now uses the
+    // same pair as the scanner and reanalyze, so status cannot go backwards
+    // here either.
+    const newStatus = statusForClassification(classification)
+    if (newStatus && matched && shouldAdvanceStatus(matched.status, newStatus)) {
+      await setStatus(matchedAppId, newStatus)
+    }
+
+    await append(matchedAppId, {
+      event_type: "email_received",
+      title: `Email: ${classification.toUpperCase()}`,
+      description: `Subject: "${subject}" from ${sender}`,
+      metadata: { messageId, classification, subject, sender },
+    })
+  }
+
+  return ok({ success: true, email: savedEmail, matchedApplicationId: matchedAppId })
+})

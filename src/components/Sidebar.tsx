@@ -9,7 +9,6 @@ import {
   Settings,
   Plus,
   Compass,
-  Terminal,
   RefreshCw,
   X
 } from "lucide-react"
@@ -44,7 +43,7 @@ export function Sidebar({
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "applications", label: "Applications", icon: Briefcase, badge: totalCount },
     { id: "kanban", label: "Pipeline Board", icon: Columns3 },
-    { id: "emails", label: "Email Radar", icon: Mail, badge: emailCount },
+    { id: "emails", label: "Emails", icon: Mail, badge: emailCount },
     { id: "webhook", label: "Webhook & Cron", icon: Webhook },
     { id: "settings", label: "Settings", icon: Settings },
   ]
@@ -62,9 +61,9 @@ export function Sidebar({
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold tracking-wider text-[var(--color-fg)] uppercase">CAREER</span>
-                <span className="text-[9px] font-semibold text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-1 py-0.2 rounded border border-[var(--color-accent)]/20">OPS</span>
+                <span className="text-3xs font-semibold text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-1 py-0.2 rounded border border-[var(--color-accent)]/20">OPS</span>
               </div>
-              <p className="text-[10px] text-[var(--color-faint)] tracking-tight">Job Application Radar</p>
+              <p className="text-3xs text-[var(--color-faint)] tracking-tight">Job applications</p>
             </div>
           </div>
 
@@ -101,12 +100,12 @@ export function Sidebar({
           className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-panel)] bg-[var(--color-accent)] py-2 text-xs font-semibold text-[#0b0c0f] shadow-sm hover:bg-[var(--color-accent)]/90 active:scale-[0.99] transition-all cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5" />
-          Track Application
+          New application
         </button>
 
         {/* Navigation Items */}
         <nav className="space-y-1">
-          <div className="label px-2 pb-1 text-[9px] text-[var(--color-faint)]">Navigation</div>
+          <div className="px-2 pb-1 text-3xs text-[var(--color-faint)]">Go to</div>
           {navItems.map((item) => {
             const Icon = item.icon
             const active = activeTab === item.id
@@ -121,20 +120,20 @@ export function Sidebar({
                 className={cx(
                   "flex w-full items-center justify-between rounded-[var(--radius-panel)] px-3 py-2 text-xs font-medium transition-colors cursor-pointer",
                   active
-                    ? "bg-[var(--color-surface)] text-[var(--color-accent)] border border-[var(--color-line)] shadow-inner"
+                    ? "bg-[var(--color-surface)] text-[var(--color-fg)] font-semibold border border-[var(--color-line)]"
                     : "text-[var(--color-muted)] hover:bg-[var(--color-surface)]/60 hover:text-[var(--color-fg)]"
                 )}
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className={cx("h-4 w-4", active ? "text-[var(--color-accent)]" : "text-[var(--color-faint)]")} />
+                  <Icon className={cx("h-4 w-4", active ? "text-[var(--color-fg)]" : "text-[var(--color-faint)]")} />
                   <span>{item.label}</span>
                 </div>
                 {item.badge !== undefined && item.badge > 0 && (
                   <span
                     className={cx(
-                      "tnum rounded-full px-2 py-0.2 text-[10px] font-semibold",
+                      "tnum rounded-full px-2 py-0.2 text-3xs font-semibold",
                       active
-                        ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)]"
+                        ? "bg-[var(--color-line)] text-[var(--color-fg)]"
                         : "bg-[var(--color-line)] text-[var(--color-muted)]"
                     )}
                   >
@@ -148,19 +147,19 @@ export function Sidebar({
       </div>
 
       {/* Bottom Infrastructure Node Info */}
-      <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3 text-[11px] space-y-2">
+      <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3 text-2xs space-y-2">
         <div className="flex items-center justify-between">
-          <span className="label text-[9px]">Tailnet Node</span>
+          <span className="text-3xs text-[var(--color-faint)]">Tailnet Node</span>
           <div className="flex items-center gap-1.5">
-            <StatusDot status="online" pulse />
-            <span className="text-[10px] text-[var(--color-accent)]">Live</span>
+            <StatusDot status="online" />
+            <span className="text-3xs text-[var(--color-muted)]">Serving</span>
           </div>
         </div>
-        <div className="text-[10px] text-[var(--color-faint)] font-mono truncate">
+        <div className="text-3xs text-[var(--color-faint)] font-mono truncate">
           your-app.your-tailnet.ts.net
         </div>
-        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-[var(--color-line-soft)] text-[var(--color-muted)]">
-          <span>DB: postgres (career)</span>
+        <div className="flex items-center justify-between text-3xs pt-1 border-t border-[var(--color-line-soft)] text-[var(--color-muted)]">
+          <span>Supabase Postgres</span>
           <span className="tnum">:8098</span>
         </div>
       </div>

@@ -3,6 +3,7 @@ import {
   MAX_MODEL_OUTPUT_TOKENS,
   SYSTEM_PROMPT,
 } from "../../supabase/functions/_shared/cloudflare-classifier.ts"
+import { OWNER_EMAIL } from "./owner.ts"
 
 export type EmailClassification = "confirmation" | "interview" | "assessment" | "question" | "rejection" | "offer" | "unrelated" | "conference"
 export type ClassifierSource = "gate" | "rule" | "fallback" | "queue" | "cloudflare" | "cache"
@@ -129,7 +130,7 @@ function deterministicExit(norm: NormalizedEmail, sender: SenderInfo): Classific
   }
 
   // 6. User's own outbound sent messages
-  if (sender.email === "owner@example.com") {
+  if (sender.email === OWNER_EMAIL) {
     return makeResult("unrelated", 0.95, "gate", "outbound email from user")
   }
 

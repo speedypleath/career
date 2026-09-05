@@ -1,15 +1,23 @@
 {
   "name": "career",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev -p 8098",
     "build": "next build",
     "start": "next start -p 8098",
     "lint": "eslint",
-    "test:classifier": "node --test --experimental-strip-types tests/email-classifier.test.ts"
+    "test:classifier": "node --test --experimental-strip-types tests/email-classifier.test.ts",
+    "test": "NODE_OPTIONS=\"--experimental-vm-modules --disable-warning=ExperimentalWarning\" jest",
+    "db:pull": "prisma db pull && prisma generate",
+    "postinstall": "prisma generate",
+    "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules --disable-warning=ExperimentalWarning\" jest --watch",
+    "test:node": "node --test --experimental-strip-types \"tests/*.test.ts\""
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "lucide-react": "^1.16.0",
     "next": "16.3.2",
     "pg": "^8.13.1",
@@ -18,13 +26,18 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/pg": "^8.11.10",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
+    "jest": "^30.5.1",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.12",
     "typescript": "^5"
   }
 }

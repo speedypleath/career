@@ -88,6 +88,18 @@ CREATE TABLE IF NOT EXISTS email_settings (
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Summaries written by the classification worker, one per email log.
+-- Added by supabase/migrations/202609040002_email_settings_summaries.sql; this
+-- file had drifted and did not declare it.
+CREATE TABLE IF NOT EXISTS email_summaries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email_log_id UUID NOT NULL UNIQUE REFERENCES email_logs(id) ON DELETE CASCADE,
+  classification TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Seed default email settings if not present
 INSERT INTO email_settings (id, gmail_account)
 VALUES ('default', 'owner@example.com')
@@ -101,3 +113,4 @@ CREATE INDEX IF NOT EXISTS idx_application_events_app_id ON application_events(a
 CREATE INDEX IF NOT EXISTS idx_email_logs_message_id ON email_logs(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_app_id ON email_logs(application_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_classification_state ON email_logs(classification_state, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_summaries_email_log_id ON email_summaries(email_log_id);

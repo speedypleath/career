@@ -60,7 +60,7 @@ scripts/stop.sh
 Gmail scanning additionally needs `gog` on `PATH` and an authorised account:
 
 ```bash
-gog auth manage login
+gog auth login          # or: gog auth add <email>
 ```
 
 The account defaults to the one stored in `email_settings`; when the token
@@ -123,7 +123,7 @@ changes against the stored corpus before shipping them:
 | `scripts/eval-classifier.ts` | Re-classifies every stored email and diffs against what is saved. Run before and after any classifier change. |
 | `scripts/debug-classify.ts` | Prints the full rule trace for one stored email. |
 | `scripts/backfill-html-bodies.ts` | One-off: flattens `email_logs.snippet` rows that were stored as raw HTML. |
-| `scripts/seed-pipeline.js` | Seeds sample applications. |
+| `scripts/seed-pipeline.cjs` | Seeds sample applications. |
 | `scripts/notify-career-app.py` | Webhook notifier used by cron. |
 
 These are standalone Node scripts run directly (`node scripts/eval-classifier.ts`)

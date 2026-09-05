@@ -3,17 +3,10 @@
 import { useState } from "react"
 import {
   Plus,
-  Building,
-  Globe,
-  Mail,
-  ExternalLink,
-  ChevronRight,
-  ChevronLeft,
   FileText,
   Inbox,
-  Sparkles
 } from "lucide-react"
-import { getStatusColor, getWorkplaceBadge, getPriorityBadge, formatDate, formatAgo, cx } from "./format"
+import { getWorkplaceBadge, getPriorityBadge, formatAgo, cx } from "./format"
 import type { Application, ApplicationStatus } from "@/types"
 
 interface KanbanViewProps {
@@ -60,7 +53,7 @@ export function KanbanView({
             Application Pipeline Board
           </h1>
           <p className="text-xs text-[var(--color-muted)]">
-            Kanban workflow from initial sweep lead to offer acceptance
+            Drag an application to move it along.
           </p>
         </div>
 
@@ -78,7 +71,7 @@ export function KanbanView({
         <button
           onClick={() => setSelectedMobileCol("all")}
           className={cx(
-            "rounded-full px-3 py-1 text-[11px] font-medium shrink-0 border transition-colors",
+            "rounded-full px-3 py-1 text-2xs font-medium shrink-0 border transition-colors",
             selectedMobileCol === "all"
               ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
               : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]"
@@ -94,14 +87,14 @@ export function KanbanView({
               key={col.id}
               onClick={() => setSelectedMobileCol(col.id)}
               className={cx(
-                "rounded-full px-3 py-1 text-[11px] font-medium shrink-0 border transition-colors flex items-center gap-1.5",
+                "rounded-full px-3 py-1 text-2xs font-medium shrink-0 border transition-colors flex items-center gap-1.5",
                 isSelected
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
                   : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]"
               )}
             >
               <span>{col.title.split("/")[0].trim()}</span>
-              <span className="tnum text-[10px] opacity-80">({count})</span>
+              <span className="tnum text-3xs opacity-80">({count})</span>
             </button>
           )
         })}
@@ -126,7 +119,7 @@ export function KanbanView({
                   <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-fg)]">
                     {col.title}
                   </span>
-                  <span className="tnum rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-bold text-[var(--color-muted)] border border-[var(--color-line)]">
+                  <span className="tnum rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-3xs font-bold text-[var(--color-muted)] border border-[var(--color-line)]">
                     {colApps.length}
                   </span>
                 </div>
@@ -135,7 +128,7 @@ export function KanbanView({
               {/* Column Cards */}
               <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
                 {colApps.length === 0 ? (
-                  <div className="rounded border border-dashed border-[var(--color-line)] p-6 text-center text-[11px] text-[var(--color-faint)]">
+                  <div className="rounded border border-dashed border-[var(--color-line)] p-6 text-center text-2xs text-[var(--color-faint)]">
                     No roles in this stage
                   </div>
                 ) : (
@@ -154,33 +147,33 @@ export function KanbanView({
                           <span className="font-bold text-xs text-[var(--color-fg)] group-hover:text-[var(--color-accent)] transition-colors">
                             {app.company}
                           </span>
-                          <span className={cx("text-[9px] px-1.5 py-0.2 rounded border font-mono font-bold", priorityBadge.bg)}>
+                          <span className={cx("text-3xs px-1.5 py-0.2 rounded border font-mono font-bold", priorityBadge.bg)}>
                             {priorityBadge.label}
                           </span>
                         </div>
 
                         {/* Job Title */}
-                        <div className="text-[11px] font-medium text-[var(--color-muted)] line-clamp-2">
+                        <div className="text-2xs font-medium text-[var(--color-muted)] line-clamp-2">
                           {app.title}
                         </div>
 
                         {/* Metadata badges */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
-                          <span className={cx("px-1.5 py-0.5 rounded border text-[9px]", workplaceBadge.bg)}>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-3xs">
+                          <span className={cx("px-1.5 py-0.5 rounded border text-3xs", workplaceBadge.bg)}>
                             {workplaceBadge.label}
                           </span>
                           <span className="text-[var(--color-faint)] font-mono">
                             via {app.application_method}
                           </span>
                           {app.salary && (
-                            <span className="text-emerald-400 font-mono text-[9px]">
+                            <span className="text-emerald-400 font-mono text-3xs">
                               {app.salary}
                             </span>
                           )}
                         </div>
 
                         {/* Indicators & Footer */}
-                        <div className="flex items-center justify-between pt-2 border-t border-[var(--color-line-soft)] text-[10px] text-[var(--color-faint)]">
+                        <div className="flex items-center justify-between pt-2 border-t border-[var(--color-line-soft)] text-3xs text-[var(--color-faint)]">
                           <span className="tnum">
                             {formatAgo(app.applied_at || app.created_at)}
                           </span>
@@ -205,7 +198,7 @@ export function KanbanView({
                           <select
                             value={app.status}
                             onChange={(e) => onUpdateStatus(app.id, e.target.value as ApplicationStatus)}
-                            className="w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] text-[10px] text-[var(--color-muted)] py-1 px-1.5 focus:outline-none"
+                            className="w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] text-3xs text-[var(--color-muted)] py-1 px-1.5 focus:outline-none"
                           >
                             <option value="wishlist">Move: Wishlist</option>
                             <option value="applied">Move: Applied</option>

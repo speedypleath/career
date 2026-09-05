@@ -14,7 +14,7 @@ const pool = new Pool({
     : {}),
 })
 
-export async function query<T extends QueryResultRow = any>(
+export async function query<T extends QueryResultRow = never>(
   text: string,
   params?: unknown[],
 ) {
