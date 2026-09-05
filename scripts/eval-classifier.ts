@@ -8,7 +8,7 @@
  * Reads every row in email_logs, re-classifies it with the current engine and
  * diffs against what is stored, so regressions are visible before a rescan.
  */
-import { Client } from "pg"
+import { createClient } from "./lib/db-config.ts"
 import { classifyEmailDetailed } from "../src/lib/email-classifier.ts"
 
 const args = process.argv.slice(2)
@@ -17,20 +17,9 @@ const showReasons = args.includes("--reasons")
 /** Persist the new verdicts. Rows a human corrected are left alone. */
 const write = args.includes("--write")
 
-const sslMode = process.env.PGSSLMODE ?? "disable"
-const client = new Client({
-  host: process.env.PGHOST ?? "127.0.0.1",
-  port: Number(process.env.PGPORT ?? 5432),
-  user: process.env.PGUSER ?? "postgres",
-  password: process.env.PGPASSWORD ?? "postgres",
-  database: process.env.PGDATABASE ?? "career",
-  // Supabase's pooler presents a chain node rejects by default. Mirrors the
-  // same allowance src/lib/db.ts makes, so this script can run against either
-  // the local `career` database or Supabase.
-  ...(sslMode === "require" || sslMode === "verify-full"
-    ? { ssl: { rejectUnauthorized: false } }
-    : {}),
-})
+// "local" here still runs against Supabase when PG* + PGSSLMODE=require are
+// exported — see scripts/lib/db-config.ts.
+const client = createClient("local")
 
 await client.connect()
 
