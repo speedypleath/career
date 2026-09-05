@@ -3,7 +3,8 @@
 //
 // This exists because protected OpenClaw store secrets can only be substituted into HTTPS
 // traffic bound to an exact host. A direct Postgres connection on 5432 is out of scope for
-// that mechanism, so scripts/restore-career-to-supabase.mjs cannot work from an agent lane.
+// that mechanism, so a plain pg_restore/psql restore against :5432 cannot work from an agent
+// lane — this script is the sole supported restore path.
 // Every request here goes to api.supabase.com, which SUPABASE_ACCESS_TOKEN and
 // SUPABASE_PROJECT_REF are already bound to.
 //
