@@ -1,7 +1,7 @@
 import { badRequest, handle, ok } from "@/lib/api-response"
 import { create, findByCompanyAndTitle, mergeFromWebhook } from "@/lib/repositories/applications"
 import { append } from "@/lib/repositories/events"
-import { normalizeWebhookPayload } from "@/lib/webhook-payload"
+import { normalizeWebhookPayload, withCreateDefaults } from "@/lib/webhook-payload"
 
 export const GET = handle("Failed to describe the webhook", async () => {
   return ok({
@@ -52,7 +52,7 @@ export const POST = handle("Webhook processing error", async (request: Request) 
     return ok({ success: true, action: "updated", id: existing.id, application })
   }
 
-  const application = await create(input)
+  const application = await create(withCreateDefaults(input))
   await append(application.id, {
     event_type: "webhook_created",
     title: "Application logged via webhook",
