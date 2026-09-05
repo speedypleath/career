@@ -1,0 +1,30 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # prisma.config.ts evaluates env("DATABASE_URL") during `prisma generate`
+  # (postinstall). CI never connects — a syntactically valid placeholder is enough.
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/career"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: verify-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
