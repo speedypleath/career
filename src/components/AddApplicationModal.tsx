@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { X, Plus, Sparkles, Building, Briefcase, Globe, Mail, DollarSign, FileText, Send } from "lucide-react"
+import { X, Plus, Building, Briefcase, Globe, Mail, DollarSign } from "lucide-react"
 import { createApplication } from "@/lib/api-client"
 import type { WorkplaceType, ApplicationStatus, ApplicationMethod, PriorityLevel } from "@/types"
 
@@ -24,12 +24,10 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
   const [url, setUrl] = useState("")
   const [salary, setSalary] = useState("")
   const [contactEmail, setContactEmail] = useState("")
-  const [contactName, setContactName] = useState("")
   const [priority, setPriority] = useState<PriorityLevel>("medium")
   const [jobDescription, setJobDescription] = useState("")
   const [infoProvided, setInfoProvided] = useState("")
   const [coverLetter, setCoverLetter] = useState("")
-  const [notes, setNotes] = useState("")
 
   if (!isOpen) return null
 
@@ -54,12 +52,10 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
         url: url.trim(),
         salary: salary.trim(),
         contact_email: contactEmail.trim(),
-        contact_name: contactName.trim(),
         priority,
         job_description: jobDescription.trim(),
         info_provided: infoProvided.trim(),
         cover_letter: coverLetter.trim(),
-        notes: notes.trim(),
         applied_at: new Date().toISOString(),
       })
 
@@ -82,8 +78,8 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
               <Plus className="h-4 w-4" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold text-[var(--color-fg)]">Track New Application</h2>
-              <p className="text-[11px] text-[var(--color-faint)]">Record position details, cover letter, and submission info</p>
+              <h2 className="text-sm font-semibold text-[var(--color-fg)]">New application</h2>
+              <p className="text-2xs text-[var(--color-faint)]">Record position details, cover letter, and submission info</p>
             </div>
           </div>
           <button
@@ -104,7 +100,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="label block mb-1.5">Job Title *</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Job title</label>
               <div className="relative">
                 <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-[var(--color-faint)]" />
                 <input
@@ -119,7 +115,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
 
             <div>
-              <label className="label block mb-1.5">Company Name *</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Company</label>
               <div className="relative">
                 <Building className="absolute left-3 top-2.5 h-4 w-4 text-[var(--color-faint)]" />
                 <input
@@ -136,7 +132,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
-              <label className="label block mb-1.5">Workplace Type</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Workplace</label>
               <select
                 value={workplaceType}
                 onChange={(e) => setWorkplaceType(e.target.value as WorkplaceType)}
@@ -149,7 +145,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
 
             <div>
-              <label className="label block mb-1.5">Application Status</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as ApplicationStatus)}
@@ -166,7 +162,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
 
             <div>
-              <label className="label block mb-1.5">Application Method</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">How you applied</label>
               <select
                 value={applicationMethod}
                 onChange={(e) => setApplicationMethod(e.target.value as ApplicationMethod)}
@@ -184,7 +180,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
-              <label className="label block mb-1.5">Location</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Location</label>
               <input
                 type="text"
                 placeholder="e.g. Amsterdam, NL / Remote"
@@ -195,7 +191,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
 
             <div>
-              <label className="label block mb-1.5">Salary / Comp</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Salary</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-[var(--color-faint)]" />
                 <input
@@ -209,7 +205,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
 
             <div>
-              <label className="label block mb-1.5">Priority</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as PriorityLevel)}
@@ -225,7 +221,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="label block mb-1.5">Job Posting URL</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Job posting URL</label>
               <div className="relative">
                 <Globe className="absolute left-3 top-2.5 h-4 w-4 text-[var(--color-faint)]" />
                 <input
@@ -239,7 +235,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             </div>
 
             <div>
-              <label className="label block mb-1.5">Contact Email / Recruiter</label>
+              <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Contact email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 h-4 w-4 text-[var(--color-faint)]" />
                 <input
@@ -254,7 +250,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
           </div>
 
           <div>
-            <label className="label block mb-1.5">Info Provided (Resume version, answers, notes)</label>
+            <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">What you sent them</label>
             <textarea
               rows={2}
               placeholder="e.g. CV: andrei-gheorghe-cv.pdf, Notice: immediate, Expected salary: €70k"
@@ -265,7 +261,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
           </div>
 
           <div>
-            <label className="label block mb-1.5">Cover Letter</label>
+            <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Cover letter</label>
             <textarea
               rows={4}
               placeholder="Paste cover letter markdown or text here..."
@@ -276,7 +272,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
           </div>
 
           <div>
-            <label className="label block mb-1.5">Job Description</label>
+            <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">Job description</label>
             <textarea
               rows={4}
               placeholder="Paste job description, requirements, tech stack..."

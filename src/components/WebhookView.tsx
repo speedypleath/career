@@ -62,7 +62,7 @@ function CopyButton({ copied, onCopy, label }: { copied: boolean; onCopy: () => 
   return (
     <button
       onClick={onCopy}
-      className="flex items-center gap-1 text-[11px] text-[var(--color-faint)] hover:text-[var(--color-accent)] transition-colors"
+      className="flex items-center gap-1 text-2xs text-[var(--color-faint)] hover:text-[var(--color-accent)] transition-colors"
     >
       {copied ? (
         <Check className="h-3.5 w-3.5 text-[var(--color-accent)]" />
@@ -176,7 +176,7 @@ export function WebhookView() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-[var(--color-fg)]">Send a test application</h2>
-            <p className="text-[11px] text-[var(--color-faint)]">
+            <p className="text-2xs text-[var(--color-faint)]">
               This writes a real application, so use a company you can recognise and delete.
             </p>
           </div>
@@ -192,7 +192,7 @@ export function WebhookView() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className="block">
-            <span className="mb-1 block text-[11px] text-[var(--color-faint)]">Company</span>
+            <span className="mb-1 block text-2xs text-[var(--color-faint)]">Company</span>
             <input
               type="text"
               value={company}
@@ -201,7 +201,7 @@ export function WebhookView() {
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] text-[var(--color-faint)]">Job title</span>
+            <span className="mb-1 block text-2xs text-[var(--color-faint)]">Job title</span>
             <input
               type="text"
               value={title}
@@ -210,7 +210,7 @@ export function WebhookView() {
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] text-[var(--color-faint)]">Workplace</span>
+            <span className="mb-1 block text-2xs text-[var(--color-faint)]">Workplace</span>
             <select
               value={workplace}
               onChange={(e) => setWorkplace(e.target.value)}
@@ -227,8 +227,8 @@ export function WebhookView() {
 
         {testResponse && (
           <div className="rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-3 space-y-1">
-            <span className="text-[11px] text-[var(--color-faint)]">What came back</span>
-            <pre className="text-[11px] font-mono text-[var(--color-fg)] max-h-40 overflow-y-auto">
+            <span className="text-2xs text-[var(--color-faint)]">What came back</span>
+            <pre className="text-2xs font-mono text-[var(--color-fg)] max-h-40 overflow-y-auto">
               {testResponse}
             </pre>
           </div>
@@ -248,7 +248,7 @@ export function WebhookView() {
               label="Copy"
             />
           </div>
-          <pre className="rounded bg-[var(--color-bg)] p-3 text-[11px] font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed">
+          <pre className="rounded bg-[var(--color-bg)] p-3 text-2xs font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed">
             {PYTHON_SNIPPET}
           </pre>
         </div>
@@ -267,7 +267,7 @@ export function WebhookView() {
               />
             )}
           </div>
-          <pre className="rounded bg-[var(--color-bg)] p-3 text-[11px] font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed whitespace-pre-wrap">
+          <pre className="rounded bg-[var(--color-bg)] p-3 text-2xs font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed whitespace-pre-wrap">
             {info ? info.curl_example : <Skeleton className="h-16 w-full" />}
           </pre>
         </div>
@@ -283,7 +283,7 @@ export function WebhookView() {
               label="Copy"
             />
           </div>
-          <pre className="rounded bg-[var(--color-bg)] p-3 text-[11px] font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed max-h-72 overflow-y-auto">
+          <pre className="rounded bg-[var(--color-bg)] p-3 text-2xs font-mono text-[var(--color-muted)] overflow-x-auto border border-[var(--color-line-soft)] leading-relaxed max-h-72 overflow-y-auto">
             {JSON.stringify(info.sample_payload, null, 2)}
           </pre>
         </div>

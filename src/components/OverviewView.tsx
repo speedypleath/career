@@ -3,24 +3,21 @@
 import {
   TrendingUp,
   Clock,
-  CheckCircle2,
   XCircle,
   Briefcase,
   Globe,
-  Mail,
   Send,
   Zap,
   ArrowUpRight,
   Sparkles,
-  Calendar,
   Building,
   RefreshCw,
   Award
 } from "lucide-react"
 import { MetricCard } from "./MetricCard"
 import { StatusDot } from "./StatusDot"
-import { getStatusColor, getWorkplaceBadge, getPriorityBadge, formatDate, formatAgo, cx } from "./format"
-import type { Application, Stats, ApplicationEvent } from "@/types"
+import { getStatusColor, getWorkplaceBadge, getPriorityBadge, formatAgo, cx } from "./format"
+import type { Application, Stats } from "@/types"
 
 interface OverviewViewProps {
   stats: Stats | null
@@ -62,14 +59,14 @@ export function OverviewView({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--color-fg)]">
-              Application Radar & Pipeline
+              Your pipeline
             </h1>
-            <span className="inline-flex items-center gap-1 rounded bg-[var(--color-accent)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent)] border border-[var(--color-accent)]/20">
-              <Sparkles className="h-3 w-3" /> Auto-Sync
+            <span className="inline-flex items-center gap-1 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-2 py-0.5 text-3xs font-medium text-[var(--color-muted)]">
+              <Sparkles className="h-3 w-3" /> Syncing on its own
             </span>
           </div>
           <p className="mt-1 text-xs text-[var(--color-muted)]">
-            Tracking multi-channel applications (portal & email), automated sweeps, and recruiter responses.
+            Every application you have sent, and what each company said back.
           </p>
         </div>
 
@@ -77,10 +74,10 @@ export function OverviewView({
           <button
             onClick={onScanEmails}
             disabled={isScanning}
-            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-3 py-1.5 text-xs font-medium text-[var(--color-fg)] hover:border-[var(--color-accent)]/40 hover:text-[var(--color-accent)] active:scale-[0.98] transition-all disabled:opacity-50"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-3 py-1.5 text-xs font-medium text-[var(--color-fg)] hover:border-[var(--color-muted)] active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            <RefreshCw className={cx("h-3.5 w-3.5", isScanning && "animate-spin text-[var(--color-accent)]")} />
-            {isScanning ? "Scanning..." : "Scan Email Radar"}
+            <RefreshCw className={cx("h-3.5 w-3.5", isScanning && "animate-spin")} />
+            {isScanning ? "Scanning" : "Scan inbox"}
           </button>
 
           <button
@@ -141,37 +138,37 @@ export function OverviewView({
         {/* Method Breakdown */}
         <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="label">Application Channel Distribution</span>
-            <span className="text-[10px] text-[var(--color-faint)]">Portal vs Direct Email</span>
+            <span className="text-xs font-semibold text-[var(--color-fg)]">How you applied</span>
+            <span className="text-3xs text-[var(--color-faint)]">Portal vs Direct Email</span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 pt-1">
             <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-2.5 text-center">
-              <div className="label text-[9px] text-[var(--color-faint)]">ATS / Portal</div>
+              <div className="text-3xs text-[var(--color-faint)]">Portal</div>
               <div className="tnum mt-1 text-lg font-bold text-[var(--color-fg)]">
                 {stats?.portalCount || 0}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-3xs text-[var(--color-muted)]">
                 {total > 0 ? Math.round(((stats?.portalCount || 0) / total) * 100) : 0}%
               </div>
             </div>
 
             <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-2.5 text-center">
-              <div className="label text-[9px] text-[var(--color-faint)]">Email Direct</div>
+              <div className="text-3xs text-[var(--color-faint)]">Email</div>
               <div className="tnum mt-1 text-lg font-bold text-[var(--color-accent)]">
                 {stats?.emailCount || 0}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-3xs text-[var(--color-muted)]">
                 {total > 0 ? Math.round(((stats?.emailCount || 0) / total) * 100) : 0}%
               </div>
             </div>
 
             <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-2.5 text-center">
-              <div className="label text-[9px] text-[var(--color-faint)]">LinkedIn / Other</div>
+              <div className="text-3xs text-[var(--color-faint)]">LinkedIn or other</div>
               <div className="tnum mt-1 text-lg font-bold text-[var(--color-fg)]">
                 {(stats?.linkedinCount || 0) + (stats?.otherMethodCount || 0)}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-3xs text-[var(--color-muted)]">
                 {total > 0 ? Math.round((((stats?.linkedinCount || 0) + (stats?.otherMethodCount || 0)) / total) * 100) : 0}%
               </div>
             </div>
@@ -181,37 +178,37 @@ export function OverviewView({
         {/* Workplace Breakdown */}
         <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="label">Workplace Scope Breakdown</span>
-            <span className="text-[10px] text-[var(--color-faint)]">Bucharest & Remote-EU</span>
+            <span className="text-xs font-semibold text-[var(--color-fg)]">Where the work is</span>
+            <span className="text-3xs text-[var(--color-faint)]">Bucharest & Remote-EU</span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 pt-1">
             <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-2.5 text-center">
-              <div className="label text-[9px] text-[var(--color-faint)]">100% Remote</div>
+              <div className="text-3xs text-[var(--color-faint)]">Remote</div>
               <div className="tnum mt-1 text-lg font-bold text-emerald-400">
                 {stats?.remoteCount || 0}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-3xs text-[var(--color-muted)]">
                 {total > 0 ? Math.round(((stats?.remoteCount || 0) / total) * 100) : 0}%
               </div>
             </div>
 
             <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-2.5 text-center">
-              <div className="label text-[9px] text-[var(--color-faint)]">Hybrid</div>
+              <div className="text-3xs text-[var(--color-faint)]">Hybrid</div>
               <div className="tnum mt-1 text-lg font-bold text-sky-400">
                 {stats?.hybridCount || 0}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-3xs text-[var(--color-muted)]">
                 {total > 0 ? Math.round(((stats?.hybridCount || 0) / total) * 100) : 0}%
               </div>
             </div>
 
             <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-2.5 text-center">
-              <div className="label text-[9px] text-[var(--color-faint)]">On-Site</div>
+              <div className="text-3xs text-[var(--color-faint)]">On-site</div>
               <div className="tnum mt-1 text-lg font-bold text-amber-400">
                 {stats?.onsiteCount || 0}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-3xs text-[var(--color-muted)]">
                 {total > 0 ? Math.round(((stats?.onsiteCount || 0) / total) * 100) : 0}%
               </div>
             </div>
@@ -228,18 +225,18 @@ export function OverviewView({
               <h2 className="text-sm font-bold tracking-tight text-[var(--color-fg)]">
                 Active & High Priority Applications
               </h2>
-              <p className="text-[11px] text-[var(--color-faint)]">
+              <p className="text-2xs text-[var(--color-faint)]">
                 Most recent opportunities requiring follow-up or in active review
               </p>
             </div>
-            <span className="label text-[9px]">Top {priorityApps.length}</span>
+            <span className="text-3xs text-[var(--color-faint)]">Top {priorityApps.length}</span>
           </div>
 
           {priorityApps.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Briefcase className="h-8 w-8 text-[var(--color-faint)] mb-2 stroke-[1.5]" />
-              <p className="text-xs text-[var(--color-muted)]">No active applications found</p>
-              <p className="text-[11px] text-[var(--color-faint)] mt-1">
+              <p className="text-xs text-[var(--color-muted)]">No applications yet</p>
+              <p className="text-2xs text-[var(--color-faint)] mt-1">
                 Add one with New application, or let the audio-job-hunter sweep post it for you.
               </p>
             </div>
@@ -261,15 +258,15 @@ export function OverviewView({
                         <span className="font-semibold text-xs text-[var(--color-fg)] group-hover:text-[var(--color-accent)] transition-colors">
                           {app.title}
                         </span>
-                        <span className={cx("text-[9px] px-1.5 py-0.2 rounded border", workplaceBadge.bg)}>
+                        <span className={cx("text-3xs px-1.5 py-0.2 rounded border", workplaceBadge.bg)}>
                           {workplaceBadge.label}
                         </span>
-                        <span className={cx("text-[9px] px-1.5 py-0.2 rounded border font-mono", priorityBadge.bg)}>
+                        <span className={cx("text-3xs px-1.5 py-0.2 rounded border font-mono", priorityBadge.bg)}>
                           {priorityBadge.label}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2.5 text-[11px] text-[var(--color-muted)] flex-wrap">
+                      <div className="flex items-center gap-2.5 text-2xs text-[var(--color-muted)] flex-wrap">
                         <span className="font-medium text-[var(--color-fg)] flex items-center gap-1">
                           <Building className="h-3 w-3 text-[var(--color-faint)]" /> {app.company}
                         </span>
@@ -282,7 +279,7 @@ export function OverviewView({
                           via {app.application_method}
                         </span>
                         {app.salary && (
-                          <span className="text-emerald-400/80 font-mono text-[10px]">
+                          <span className="text-emerald-400/80 font-mono text-3xs">
                             {app.salary}
                           </span>
                         )}
@@ -290,10 +287,10 @@ export function OverviewView({
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-[var(--color-line-soft)]">
-                      <span className={cx("text-[10px] px-2 py-0.5 rounded border font-medium", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                      <span className={cx("text-3xs px-2 py-0.5 rounded border font-medium", statusStyle.bg, statusStyle.text, statusStyle.border)}>
                         {statusStyle.label}
                       </span>
-                      <span className="tnum text-[10px] text-[var(--color-faint)]">
+                      <span className="tnum text-3xs text-[var(--color-faint)]">
                         {formatAgo(app.applied_at || app.created_at)}
                       </span>
                       <ArrowUpRight className="h-3.5 w-3.5 text-[var(--color-faint)] group-hover:text-[var(--color-accent)] transition-colors hidden sm:block" />
@@ -309,18 +306,18 @@ export function OverviewView({
         <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold tracking-tight text-[var(--color-fg)]">
-              Radar Timeline
+              Recent activity
             </h2>
             <div className="flex items-center gap-1.5">
-              <StatusDot status="online" pulse />
-              <span className="label text-[9px] text-[var(--color-accent)]">Live Log</span>
+              <StatusDot status="online" />
+              <span className="text-3xs text-[var(--color-faint)]">Newest first</span>
             </div>
           </div>
 
           <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
             {!stats?.recentEvents || stats.recentEvents.length === 0 ? (
               <div className="py-8 text-center text-xs text-[var(--color-faint)]">
-                No activity logged yet.
+                Nothing has happened yet. Scan the inbox or add an application.
               </div>
             ) : (
               stats.recentEvents.map((evt) => (
@@ -333,15 +330,15 @@ export function OverviewView({
                     <span className="font-semibold text-xs text-[var(--color-fg)] truncate">
                       {evt.company || "Application"}
                     </span>
-                    <span className="tnum text-[9px] text-[var(--color-faint)]">
+                    <span className="tnum text-3xs text-[var(--color-faint)]">
                       {formatAgo(evt.created_at)}
                     </span>
                   </div>
-                  <p className="text-[11px] font-medium text-[var(--color-accent)]">
+                  <p className="text-2xs font-medium text-[var(--color-accent)]">
                     {evt.title}
                   </p>
                   {evt.description && (
-                    <p className="text-[10px] text-[var(--color-muted)] line-clamp-2">
+                    <p className="text-3xs text-[var(--color-muted)] line-clamp-2">
                       {evt.description}
                     </p>
                   )}

@@ -36,7 +36,7 @@ export function Tabs({ active, onChange, emailCount, timelineCount, hasCoverLett
           {tab.label}
           {tab.dot && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />}
           {tab.count ? (
-            <span className="rounded-full bg-[var(--color-line)] px-1.5 py-0.2 text-[10px] text-[var(--color-muted)]">
+            <span className="rounded-full bg-[var(--color-line)] px-1.5 py-0.2 text-3xs text-[var(--color-muted)]">
               {tab.count}
             </span>
           ) : null}

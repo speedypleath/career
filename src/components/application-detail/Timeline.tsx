@@ -60,11 +60,11 @@ export function Timeline({ events, emails, onAddNote, submitting }: TimelineProp
             >
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="font-semibold text-[var(--color-fg)] truncate">{email.subject}</span>
-                <span className="text-[10px] text-[var(--color-faint)] shrink-0">
+                <span className="text-3xs text-[var(--color-faint)] shrink-0">
                   {formatDateTime(email.received_at)}
                 </span>
               </div>
-              <div className="text-[11px] text-[var(--color-faint)]">
+              <div className="text-2xs text-[var(--color-faint)]">
                 From <span className="text-[var(--color-muted)]">{email.sender}</span> · read as{" "}
                 <span className="text-[var(--color-muted)]">{email.classification}</span>
               </div>
@@ -92,7 +92,7 @@ export function Timeline({ events, emails, onAddNote, submitting }: TimelineProp
               <div className="flex-1 space-y-0.5 min-w-0">
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="font-medium text-[var(--color-fg)]">{event.title}</span>
-                  <span className="text-[10px] text-[var(--color-faint)] shrink-0">
+                  <span className="text-3xs text-[var(--color-faint)] shrink-0">
                     {formatDateTime(event.created_at)}
                   </span>
                 </div>

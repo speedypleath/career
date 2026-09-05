@@ -3,25 +3,14 @@
 import { useState } from "react"
 import {
   Search,
-  Filter,
   Plus,
-  ArrowUpDown,
-  Building,
   Globe,
-  Mail,
   ExternalLink,
   FileText,
-  MessageSquare,
-  CheckCircle2,
-  AlertCircle,
-  MoreVertical,
-  Trash2,
-  Edit2,
   Inbox
 } from "lucide-react"
-import { StatusDot } from "./StatusDot"
 import { getStatusColor, getWorkplaceBadge, getPriorityBadge, formatDate, formatAgo, cx } from "./format"
-import type { Application, ApplicationStatus, WorkplaceType, ApplicationMethod } from "@/types"
+import type { Application, ApplicationStatus } from "@/types"
 
 interface ApplicationsViewProps {
   applications: Application[]
@@ -38,7 +27,6 @@ export function ApplicationsView({
   onSelectApplication,
   onOpenAddModal,
   onUpdateStatus,
-  onRefresh,
 }: ApplicationsViewProps) {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -199,23 +187,23 @@ export function ApplicationsView({
                     <span className="font-bold text-xs text-[var(--color-fg)] truncate block">
                       {app.company}
                     </span>
-                    <span className="text-[11px] text-[var(--color-muted)] font-medium line-clamp-1">
+                    <span className="text-2xs text-[var(--color-muted)] font-medium line-clamp-1">
                       {app.title}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className={cx("text-[9px] px-1.5 py-0.2 rounded border font-mono", priorityBadge.bg)}>
+                    <span className={cx("text-3xs px-1.5 py-0.2 rounded border font-mono", priorityBadge.bg)}>
                       {priorityBadge.label}
                     </span>
-                    <span className={cx("text-[9px] px-1.5 py-0.2 rounded border", workplaceBadge.bg)}>
+                    <span className={cx("text-3xs px-1.5 py-0.2 rounded border", workplaceBadge.bg)}>
                       {workplaceBadge.label}
                     </span>
                   </div>
                 </div>
 
                 {/* Metadata row */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--color-faint)]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xs text-[var(--color-faint)]">
                   {app.location && (
                     <span className="flex items-center gap-1">
                       <Globe className="h-2.5 w-2.5" /> {app.location}
@@ -236,7 +224,7 @@ export function ApplicationsView({
                     value={app.status}
                     onChange={(e) => onUpdateStatus(app.id, e.target.value as ApplicationStatus)}
                     className={cx(
-                      "rounded border text-[10px] font-semibold py-1 px-2 focus:outline-none transition-colors cursor-pointer flex-1 max-w-44",
+                      "rounded border text-3xs font-semibold py-1 px-2 focus:outline-none transition-colors cursor-pointer flex-1 max-w-44",
                       statusStyle.bg,
                       statusStyle.text,
                       statusStyle.border
@@ -266,7 +254,7 @@ export function ApplicationsView({
                     )}
                     <button
                       onClick={() => onSelectApplication(app.id)}
-                      className="rounded px-2.5 py-1 text-[10px] font-medium border border-[var(--color-line)] bg-[var(--color-surface-hi)] text-[var(--color-fg)]"
+                      className="rounded px-2.5 py-1 text-3xs font-medium border border-[var(--color-line)] bg-[var(--color-surface-hi)] text-[var(--color-fg)]"
                     >
                       Details
                     </button>
@@ -282,7 +270,7 @@ export function ApplicationsView({
       <div className="hidden md:block overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-[var(--color-line)] bg-[var(--color-rail)] text-[10px] uppercase tracking-wider text-[var(--color-faint)]">
+            <thead className="border-b border-[var(--color-line)] bg-[var(--color-rail)] text-3xs uppercase tracking-wider text-[var(--color-faint)]">
               <tr>
                 <th className="py-3 px-4">Company & Title</th>
                 <th className="py-3 px-3">Workplace</th>
@@ -319,15 +307,15 @@ export function ApplicationsView({
                             <span className="font-bold text-[var(--color-fg)] group-hover:text-[var(--color-accent)] transition-colors">
                               {app.company}
                             </span>
-                            <span className={cx("text-[9px] px-1 py-0.2 rounded border font-mono", priorityBadge.bg)}>
+                            <span className={cx("text-3xs px-1 py-0.2 rounded border font-mono", priorityBadge.bg)}>
                               {priorityBadge.label}
                             </span>
                           </div>
-                          <div className="text-[11px] text-[var(--color-muted)] font-medium">
+                          <div className="text-2xs text-[var(--color-muted)] font-medium">
                             {app.title}
                           </div>
                           {app.location && (
-                            <div className="text-[10px] text-[var(--color-faint)] flex items-center gap-1">
+                            <div className="text-3xs text-[var(--color-faint)] flex items-center gap-1">
                               <Globe className="h-2.5 w-2.5" /> {app.location}
                             </div>
                           )}
@@ -336,7 +324,7 @@ export function ApplicationsView({
 
                       {/* Workplace Type */}
                       <td className="py-3 px-3">
-                        <span className={cx("text-[10px] px-2 py-0.5 rounded border font-medium", workplaceBadge.bg)}>
+                        <span className={cx("text-3xs px-2 py-0.5 rounded border font-medium", workplaceBadge.bg)}>
                           {workplaceBadge.label}
                         </span>
                       </td>
@@ -347,7 +335,7 @@ export function ApplicationsView({
                           value={app.status}
                           onChange={(e) => onUpdateStatus(app.id, e.target.value as ApplicationStatus)}
                           className={cx(
-                            "rounded border text-[10px] font-semibold py-1 px-2 focus:outline-none transition-colors cursor-pointer",
+                            "rounded border text-3xs font-semibold py-1 px-2 focus:outline-none transition-colors cursor-pointer",
                             statusStyle.bg,
                             statusStyle.text,
                             statusStyle.border
@@ -366,7 +354,7 @@ export function ApplicationsView({
 
                       {/* Application Method */}
                       <td className="py-3 px-3">
-                        <span className="text-[11px] text-[var(--color-muted)] font-mono capitalize">
+                        <span className="text-2xs text-[var(--color-muted)] font-mono capitalize">
                           {app.application_method}
                         </span>
                       </td>
@@ -377,7 +365,7 @@ export function ApplicationsView({
                           {app.cover_letter && (
                             <span
                               title="Cover letter stored"
-                              className="rounded bg-[var(--color-line-soft)] px-1.5 py-0.5 text-[9px] font-mono text-[var(--color-muted)] flex items-center gap-1 border border-[var(--color-line)]"
+                              className="rounded bg-[var(--color-line-soft)] px-1.5 py-0.5 text-3xs font-mono text-[var(--color-muted)] flex items-center gap-1 border border-[var(--color-line)]"
                             >
                               <FileText className="h-2.5 w-2.5 text-[var(--color-accent)]" /> Letter
                             </span>
@@ -385,7 +373,7 @@ export function ApplicationsView({
                           {app.info_provided && (
                             <span
                               title="Application info provided notes"
-                              className="rounded bg-[var(--color-line-soft)] px-1.5 py-0.5 text-[9px] font-mono text-[var(--color-muted)] border border-[var(--color-line)]"
+                              className="rounded bg-[var(--color-line-soft)] px-1.5 py-0.5 text-3xs font-mono text-[var(--color-muted)] border border-[var(--color-line)]"
                             >
                               Info
                             </span>
@@ -393,7 +381,7 @@ export function ApplicationsView({
                           {app.emails_count !== undefined && Number(app.emails_count) > 0 && (
                             <span
                               title={`${app.emails_count} associated email responses`}
-                              className="rounded bg-[var(--color-accent)]/10 px-1.5 py-0.5 text-[9px] font-mono text-[var(--color-accent)] border border-[var(--color-accent)]/20 flex items-center gap-1"
+                              className="rounded bg-[var(--color-accent)]/10 px-1.5 py-0.5 text-3xs font-mono text-[var(--color-accent)] border border-[var(--color-accent)]/20 flex items-center gap-1"
                             >
                               <Inbox className="h-2.5 w-2.5" /> {app.emails_count}
                             </span>
@@ -403,10 +391,10 @@ export function ApplicationsView({
 
                       {/* Applied Date */}
                       <td className="py-3 px-3">
-                        <div className="text-[11px] text-[var(--color-fg)]">
+                        <div className="text-2xs text-[var(--color-fg)]">
                           {formatDate(app.applied_at || app.created_at)}
                         </div>
-                        <div className="tnum text-[10px] text-[var(--color-faint)]">
+                        <div className="tnum text-3xs text-[var(--color-faint)]">
                           {formatAgo(app.applied_at || app.created_at)}
                         </div>
                       </td>
@@ -427,7 +415,7 @@ export function ApplicationsView({
                           )}
                           <button
                             onClick={() => onSelectApplication(app.id)}
-                            className="rounded px-2 py-1 text-[10px] font-medium border border-[var(--color-line)] text-[var(--color-muted)] hover:bg-[var(--color-surface-hi)] hover:text-[var(--color-fg)]"
+                            className="rounded px-2 py-1 text-3xs font-medium border border-[var(--color-line)] text-[var(--color-muted)] hover:bg-[var(--color-surface-hi)] hover:text-[var(--color-fg)]"
                           >
                             Inspect
                           </button>

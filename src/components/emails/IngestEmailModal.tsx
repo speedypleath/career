@@ -55,7 +55,7 @@ export function IngestEmailModal({ onClose, onIngested }: IngestEmailModalProps)
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label htmlFor="ingest-sender" className="label block mb-1">
+            <label htmlFor="ingest-sender" className="mb-1 block text-2xs text-[var(--color-faint)]">
               Sender
             </label>
             <input
@@ -70,7 +70,7 @@ export function IngestEmailModal({ onClose, onIngested }: IngestEmailModalProps)
           </div>
 
           <div>
-            <label htmlFor="ingest-subject" className="label block mb-1">
+            <label htmlFor="ingest-subject" className="mb-1 block text-2xs text-[var(--color-faint)]">
               Subject
             </label>
             <input
@@ -85,7 +85,7 @@ export function IngestEmailModal({ onClose, onIngested }: IngestEmailModalProps)
           </div>
 
           <div>
-            <label htmlFor="ingest-body" className="label block mb-1">
+            <label htmlFor="ingest-body" className="mb-1 block text-2xs text-[var(--color-faint)]">
               Body
             </label>
             <textarea
