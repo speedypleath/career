@@ -38,5 +38,11 @@ next-env.d.ts
 supabase/.temp/
 .temp/
 
+# supabase CLI local state
+supabase/.branches/
+
+# npm is the package manager here; a bun.lock is a stray
+bun.lock
+
 # MCP server config (may contain project refs/tokens)
 .mcp.json

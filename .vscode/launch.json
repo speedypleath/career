@@ -1,0 +1,57 @@
+{
+  // Every config below is "node-terminal": it runs the command in an integrated
+  // terminal and auto-attaches the debugger to it, including child processes.
+  // That matters here because the env lives in a shell-style .env (see the
+  // "Script" configs) and because Next spawns the compiler as a child.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Breakpoints in route handlers, src/lib/**, and Server Components.
+      "name": "Next.js: dev server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      // Breakpoints in "use client" components. Start the server first.
+      "name": "Next.js: browser",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8098",
+      "webRoot": "${workspaceFolder}",
+      "sourceMapPathOverrides": {
+        "webpack://_N_E/*": "${webRoot}/*",
+        "turbopack://[project]/*": "${webRoot}/*"
+      }
+    },
+            {
+      // scripts/*.ts read PG* straight off process.env and fall back to
+      // localhost, so the shell has to source .env first. VS Code's own
+      // "envFile" cannot do it: .env uses `export` prefixes and ${VAR}
+      // interpolation, and the envFile parser understands neither.
+      "name": "Script: current file (with .env)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "set -a; . ./.env; set +a; node --experimental-strip-types \"${relativeFile}\"",
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Script: eval-classifier (with .env)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "set -a; . ./.env; set +a; node scripts/eval-classifier.ts",
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Next.js: full stack",
+      "configurations": ["Next.js: dev server", "Next.js: browser"],
+      "stopAll": true
+    }
+  ]
+}
