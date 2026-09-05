@@ -1,5 +1,6 @@
-import { query } from "../src/lib/db"
-import { classifyEmailDetailed } from "../src/lib/email-classifier"
+import { query } from "../src/lib/db.ts"
+import { classifyEmailDetailed } from "../src/lib/email-classifier.ts"
+import { deleteBogusApplications } from "./lib/bogus-apps.ts"
 
 async function fix() {
   const emails = await query(
@@ -32,16 +33,9 @@ async function fix() {
 
   console.log("Classified: " + nonJobCount + " non-job. Unlinked " + unlinked + " falsely linked emails.")
 
-  // Delete bogus applications (e.g. Unknown Company, Mailer, ADCx, etc.)
-  const bogus = await query(
-    "SELECT id, company, title FROM applications WHERE lower(coalesce(company,'')) IN ('unknown company','unknown role','unknown','mailer','adcx','ground news','niv news','linkedin','hipo','hipo.ro') OR lower(coalesce(title,'')) IN ('unknown role','unknown company')"
-  )
-  console.log("Found bogus applications:", bogus.rows.length)
-  for (const b of bogus.rows) {
-    await query("UPDATE email_logs SET application_id = NULL WHERE application_id = $1", [b.id])
-    await query("DELETE FROM application_events WHERE application_id = $1", [b.id])
-    await query("DELETE FROM applications WHERE id = $1", [b.id])
-  }
+  // Delete bogus applications (canonical list — see scripts/lib/bogus-apps.ts)
+  const bogus = await deleteBogusApplications(query)
+  console.log("Found bogus applications:", bogus.length)
   console.log("Deleted bogus applications successfully.")
 }
 

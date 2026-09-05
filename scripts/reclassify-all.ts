@@ -1,18 +1,12 @@
 // Bulk re-run the deterministic classifier over every email_log, fixing
 // historical misclassifications (spam/newsletters → unrelated, conferences →
 // conference) and unlinking/deleting bogus applications.
-import { Client } from "pg"
+import { createClient } from "./lib/db-config.ts"
 import { classifyEmailDetailed } from "../src/lib/email-classifier.ts"
 import { buildClassificationJob } from "../src/lib/email-classification-queue.ts"
+import { deleteBogusApplications } from "./lib/bogus-apps.ts"
 
-const client = new Client({
-  host: process.env.PGHOST ?? "aws-1-eu-west-1.pooler.supabase.com",
-  port: Number(process.env.PGPORT ?? 5432),
-  user: process.env.PGUSER ?? "postgres.your-project-ref",
-  password: process.env.PGPASSWORD ?? process.env.SUPABASE_DB_PASSWORD,
-  database: process.env.PGDATABASE ?? "postgres",
-  ssl: { rejectUnauthorized: false },
-})
+const client = createClient("supabase")
 
 async function main() {
   await client.connect()
@@ -77,21 +71,9 @@ async function main() {
 
   console.log(`Done. resolved=${resolved} queued=${queued} skipped=${skipped}`)
 
-  // Clean up bogus applications
-  const { rows: bogus } = await client.query<{ id: string }>(
-    `SELECT id FROM applications
-      WHERE lower(coalesce(company,'')) IN ('unknown company','unknown role','unknown','')
-         OR lower(coalesce(title,'')) IN ('unknown role','unknown company','')
-         OR lower(coalesce(company,'')) ~ '^(linkedin|niv news|ground news|groundnews|hipo|hipo\.ro|newsletter|news|adcx|ismir|google forms|smartrecruiters|greenhouse|workable|ashby|lever)$'`
-  )
-  if (bogus.length) {
-    await client.query(`UPDATE email_logs SET application_id=NULL WHERE application_id = ANY($1)`, [bogus.map(b => b.id)])
-    await client.query(`DELETE FROM application_events WHERE application_id = ANY($1)`, [bogus.map(b => b.id)])
-    await client.query(`DELETE FROM applications WHERE id = ANY($1)`, [bogus.map(b => b.id)])
-    console.log(`Deleted ${bogus.length} bogus applications.`)
-  } else {
-    console.log("No bogus applications found.")
-  }
+  // Clean up bogus applications (canonical list — see scripts/lib/bogus-apps.ts)
+  const bogus = await deleteBogusApplications((text, params) => client.query(text, params))
+  console.log(bogus.length ? `Deleted ${bogus.length} bogus applications.` : "No bogus applications found.")
 
   const { rows: counts } = await client.query(`SELECT classification, count(*) FROM email_logs GROUP BY 1 ORDER BY 2 DESC`)
   console.log("Final classification counts:", counts)

@@ -1,15 +1,8 @@
-import { Client } from "pg"
+import { createClient } from "./lib/db-config.ts"
 import { classifyEmailDetailed } from "../src/lib/email-classifier.ts"
 import { buildClassificationJob } from "../src/lib/email-classification-queue.ts"
 
-const client = new Client({
-  host: process.env.PGHOST ?? "aws-1-eu-west-1.pooler.supabase.com",
-  port: Number(process.env.PGPORT ?? 5432),
-  user: process.env.PGUSER ?? "postgres.your-project-ref",
-  password: process.env.PGPASSWORD,
-  database: process.env.PGDATABASE ?? "postgres",
-  ssl: { rejectUnauthorized: false },
-})
+const client = createClient("supabase")
 
 await client.connect()
 

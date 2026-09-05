@@ -1,13 +1,6 @@
-import { Pool } from 'pg';
+import { createPool } from './lib/db-config.ts'
 
-const pool = new Pool({
-  host: process.env.PGHOST || 'aws-1-eu-west-1.pooler.supabase.com',
-  user: process.env.PGUSER || 'postgres.your-project-ref',
-  password: process.env.PGPASSWORD || process.env.SUPABASE_DB_PASSWORD,
-  database: process.env.PGDATABASE || 'postgres',
-  port: 5432,
-  ssl: { rejectUnauthorized: false }
-});
+const pool = createPool('supabase')
 
 async function run() {
   const client = await pool.connect();
