@@ -14,8 +14,12 @@ The queue insert wakes the Edge Function through `pg_net`. Supabase Cron also in
 
 ## Token and request budgets
 
-- Maximum estimated input: 1,100 tokens, including the system prompt.
-- Maximum output: 3 tokens; only a single digit from `0` through `6` is accepted.
+- Maximum estimated input: 1,500 tokens, including the system prompt
+  (`MAX_MODEL_INPUT_TOKENS` in `src/lib/email-classifier.ts`).
+- Maximum output: 16 tokens (`MAX_MODEL_OUTPUT_TOKENS`); a single digit from
+  `0` through `7` is read out of the reply. The 1B model is chatty, so
+  `parseClassification` tolerates prose around the digit rather than demanding
+  the digit alone.
 - Maximum queued classifications per Gmail scan: 12 by default.
 - The queue payload contains the bounded prompt and operational metadata, never the full email body.
 - Repeated bounded prompts use the database cache and consume no Cloudflare tokens.
@@ -61,7 +65,13 @@ npm run test:classifier
 npm run build
 ```
 
-The automated tests prove deterministic zero-token exits, the 1,100-token prompt ceiling, queue payload minimization, strict one-digit parsing, and the Cloudflare three-token output cap.
+The automated tests prove deterministic zero-token exits, the 1,500-token
+prompt ceiling, queue payload minimization, digit parsing that survives the
+model's prose, and the 16-token output cap.
+
+`npm test` runs those suites plus the rest under jest; `npm run test:node`
+runs the same files under `node --test` with no dependencies, which is what
+catches drift in the two shims that map one runner onto the other.
 
 For a live smoke test, enqueue one synthetic ambiguous message, invoke the function, and verify that:
 
