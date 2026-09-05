@@ -46,3 +46,6 @@ bun.lock
 
 # MCP server config (may contain project refs/tokens)
 .mcp.json
+
+# superpowers planning docs (local only)
+/docs/superpowers/
