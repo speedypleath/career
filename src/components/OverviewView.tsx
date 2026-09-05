@@ -240,7 +240,7 @@ export function OverviewView({
               <Briefcase className="h-8 w-8 text-[var(--color-faint)] mb-2 stroke-[1.5]" />
               <p className="text-xs text-[var(--color-muted)]">No active applications found</p>
               <p className="text-[11px] text-[var(--color-faint)] mt-1">
-                Click "+ New Application" or run the automated audio-job-hunter sweep webhook.
+                Add one with New application, or let the audio-job-hunter sweep post it for you.
               </p>
             </div>
           ) : (
