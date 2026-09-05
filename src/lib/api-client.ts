@@ -62,8 +62,16 @@ export async function getApplications(query: ApplicationQuery = {}): Promise<App
   return data.applications ?? []
 }
 
-export async function getApplication(id: string): Promise<Application> {
-  const data = await request<{ application: Application }>(`/api/applications/${id}`)
+/**
+ * One application with everything the detail view needs. The route always
+ * returns all three collections, so they are required here even though they
+ * are optional on Application itself (the list route omits them).
+ */
+export type ApplicationDetail = Application &
+  Required<Pick<Application, "events" | "emails" | "suggestedEmails">>
+
+export async function getApplication(id: string): Promise<ApplicationDetail> {
+  const data = await request<{ application: ApplicationDetail }>(`/api/applications/${id}`)
   return data.application
 }
 
