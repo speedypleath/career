@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Mail, Radio, Save } from "lucide-react"
+import { Check, ExternalLink, FileText, Mail, Radio, Save } from "lucide-react"
 import { ErrorBanner } from "./ErrorBanner"
 import { Skeleton } from "./Skeleton"
 import { WebhookView } from "./WebhookView"
@@ -159,6 +159,28 @@ function SettingsForm({ settings, onSaved, onError }: SettingsFormProps) {
             <div className="text-3xs text-[var(--color-faint)]">Hosted, over the connection pooler</div>
           </div>
         </div>
+      </div>
+
+      {/* API documentation */}
+      <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 space-y-3">
+        <div className="flex items-center gap-2 border-b border-[var(--color-line-soft)] pb-3">
+          <FileText className="h-4 w-4 text-[var(--color-accent)]" />
+          <h2 className="text-sm font-bold text-[var(--color-fg)]">API documentation</h2>
+        </div>
+
+        <p className="text-xs text-[var(--color-muted)]">
+          The HTTP API is described in OpenAPI and served as an interactive Swagger UI.
+        </p>
+
+        <a
+          href="/api/docs"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded border border-[var(--color-line)] px-3 py-1.5 text-xs font-semibold text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Open Swagger docs
+        </a>
       </div>
 
       {/* Save Actions */}
