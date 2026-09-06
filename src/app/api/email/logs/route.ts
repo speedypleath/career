@@ -7,6 +7,7 @@ export const GET = handle("Failed to fetch email logs", async (request: Request)
   const emails = await findAll({
     classification: searchParams.get("classification"),
     search: searchParams.get("search"),
+    excludeUnrelated: searchParams.get("excludeUnrelated") === "true",
   })
   return ok({ emails })
 })

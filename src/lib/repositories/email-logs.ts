@@ -14,6 +14,7 @@ export type EmailLogWithApplication = EmailLog & { company: string | null; app_t
 export interface LogFilters {
   classification?: string | null
   search?: string | null
+  excludeUnrelated?: boolean
 }
 
 /**
@@ -30,6 +31,12 @@ export async function findAll(filters: LogFilters = {}): Promise<EmailLogWithApp
   if (filters.classification && filters.classification !== "all") {
     params.push(filters.classification)
     conditions.push(`m.classification = $${params.length}`)
+  }
+
+  // A user filtering explicitly to "unrelated" wins over the toggle — AND-ing
+  // the two would always return zero rows.
+  if (filters.excludeUnrelated && filters.classification !== "unrelated") {
+    conditions.push(`m.classification != 'unrelated'`)
   }
 
   if (filters.search) {

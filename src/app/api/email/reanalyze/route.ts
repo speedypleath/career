@@ -37,10 +37,15 @@ async function reanalyze(
 
   const content = email.body || email.snippet || ""
 
-  const matched = email.application_id
-    ? await findBasics(email.application_id)
-    : matchByCompanyMention(await findAllForMatching(), email.sender, email.subject, content)
-  const matchedAppId = email.application_id || matched?.id || null
+  // Always re-run matching against the fresh content, even for an already-linked
+  // email — this is what lets reanalyze correct a wrong link, not just the label.
+  // matchByCompanyMention is a plain substring check (see
+  // src/lib/repositories/applications.ts), so "no literal company mention" is
+  // common even for a genuinely correct link — fall back to the existing link's
+  // basics in that case rather than clearing it outright.
+  const rematch = matchByCompanyMention(await findAllForMatching(), email.sender, email.subject, content)
+  const matched = rematch ?? (email.application_id ? await findBasics(email.application_id) : null)
+  const matchedAppId = matched?.id ?? null
 
   const verdict = await classifyEmailDetailed({
     subject: email.subject,

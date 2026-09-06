@@ -8,6 +8,8 @@ interface EmailFiltersProps {
   onSearchChange: (value: string) => void
   classification: string
   onClassificationChange: (value: string) => void
+  excludeUnrelated: boolean
+  onExcludeUnrelatedChange: (value: boolean) => void
   count: number
 }
 
@@ -16,6 +18,8 @@ export function EmailFilters({
   onSearchChange,
   classification,
   onClassificationChange,
+  excludeUnrelated,
+  onExcludeUnrelatedChange,
   count,
 }: EmailFiltersProps) {
   return (
@@ -45,6 +49,16 @@ export function EmailFilters({
           </option>
         ))}
       </select>
+
+      <label className="flex items-center gap-1.5 text-xs text-[var(--color-muted)] whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={excludeUnrelated}
+          onChange={(e) => onExcludeUnrelatedChange(e.target.checked)}
+          className="accent-[var(--color-accent)]"
+        />
+        Hide unrelated
+      </label>
     </div>
   )
 }
