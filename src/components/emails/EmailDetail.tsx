@@ -3,13 +3,16 @@
 import { ArrowUpRight } from "lucide-react"
 import { formatDateTime } from "../format"
 import { ClassificationPicker } from "./ClassificationPicker"
-import type { EmailLog } from "@/types"
+import type { Application, EmailLog } from "@/types"
 
 interface EmailDetailProps {
   email: EmailLog
+  applications: Application[]
   onChangeClassification: (classification: string) => void
+  onChangeApplication: (applicationId: string | null) => void
   onReanalyze: () => void
   reanalyzing: boolean
+  linking: boolean
   onOpenApplication: (applicationId: string) => void
   bodyClassName?: string
 }
@@ -23,9 +26,12 @@ interface EmailDetailProps {
  */
 export function EmailDetail({
   email,
+  applications,
   onChangeClassification,
+  onChangeApplication,
   onReanalyze,
   reanalyzing,
+  linking,
   onOpenApplication,
   bodyClassName = "max-h-64",
 }: EmailDetailProps) {
@@ -60,21 +66,35 @@ export function EmailDetail({
         <p className="text-xs font-bold text-[var(--color-fg)] mt-0.5">{email.subject}</p>
       </div>
 
-      {email.application_id && (
-        <div className="rounded border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5 p-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-3xs text-[var(--color-accent)] font-semibold truncate">
-              Linked to {email.company || "an application"}
-            </span>
+      <div>
+        <span className="text-3xs text-[var(--color-faint)]">Application</span>
+        <div className="mt-1 flex items-center gap-1.5">
+          <select
+            value={email.application_id ?? ""}
+            onChange={(e) => onChangeApplication(e.target.value || null)}
+            disabled={linking}
+            aria-label="Linked application"
+            className="flex-1 min-w-0 rounded border border-[var(--color-line)] bg-[var(--color-bg)] px-2 py-1 text-xs text-[var(--color-fg)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-50"
+          >
+            <option value="">Not linked</option>
+            {applications.map((app) => (
+              <option key={app.id} value={app.id}>
+                {app.company} — {app.title}
+              </option>
+            ))}
+          </select>
+          {email.application_id && (
             <button
+              type="button"
               onClick={() => onOpenApplication(email.application_id!)}
-              className="text-3xs text-[var(--color-fg)] hover:text-[var(--color-accent)] flex items-center gap-0.5 shrink-0"
+              title="Open application"
+              className="shrink-0 rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] p-1.5 text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors"
             >
-              Open <ArrowUpRight className="h-3 w-3" />
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div>
         <span className="text-3xs text-[var(--color-faint)]">Body</span>

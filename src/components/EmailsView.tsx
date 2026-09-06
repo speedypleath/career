@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Inbox, Mail, Plus, RefreshCw } from "lucide-react"
 import { ErrorBanner } from "./ErrorBanner"
 import { EmailDetail } from "./emails/EmailDetail"
@@ -8,10 +8,11 @@ import { EmailFilters } from "./emails/EmailFilters"
 import { EmailRow } from "./emails/EmailRow"
 import { IngestEmailModal } from "./emails/IngestEmailModal"
 import { cx } from "./format"
-import { reanalyzeEmail, setEmailClassification } from "@/lib/api-client"
+import { getApplications, linkEmailToApplication, reanalyzeEmail, setEmailClassification } from "@/lib/api-client"
+import { useAsync } from "@/hooks/useAsync"
 import { useEmailLogs } from "@/hooks/useEmailLogs"
 import { OWNER_EMAIL } from "@/lib/owner"
-import type { EmailLog } from "@/types"
+import type { Application, EmailLog } from "@/types"
 
 interface EmailsViewProps {
   onScanEmails: () => void | Promise<void>
@@ -34,11 +35,16 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
     setClassification,
     search,
     setSearch,
+    excludeUnrelated,
+    setExcludeUnrelated,
   } = useEmailLogs()
+
+  const { data: applications } = useAsync<Application[]>(useCallback(() => getApplications(), []), [])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showIngest, setShowIngest] = useState(false)
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
+  const [linkingId, setLinkingId] = useState<string | null>(null)
   // A reanalysis that declines to run is a success, not a failure, so it gets
   // its own neutral line rather than the red banner.
   const [notice, setNotice] = useState<string | null>(null)
@@ -65,6 +71,17 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
       applyUpdate(await setEmailClassification(id, next))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change the classification")
+    }
+  }
+
+  async function handleChangeApplication(id: string, applicationId: string | null) {
+    setLinkingId(id)
+    try {
+      applyUpdate(await linkEmailToApplication(id, applicationId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change the linked application")
+    } finally {
+      setLinkingId(null)
     }
   }
 
@@ -136,6 +153,8 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
         onSearchChange={setSearch}
         classification={classification}
         onClassificationChange={setClassification}
+        excludeUnrelated={excludeUnrelated}
+        onExcludeUnrelatedChange={setExcludeUnrelated}
         count={emails.length}
       />
 
@@ -181,9 +200,12 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
           ) : (
             <EmailDetail
               email={selectedEmail}
+              applications={applications}
               onChangeClassification={(next) => handleChangeClassification(selectedEmail.id, next)}
+              onChangeApplication={(next) => handleChangeApplication(selectedEmail.id, next)}
               onReanalyze={() => handleReanalyze(selectedEmail.id)}
               reanalyzing={reanalyzingId === selectedEmail.id}
+              linking={linkingId === selectedEmail.id}
               onOpenApplication={onSelectApplication}
             />
           )}
@@ -207,9 +229,12 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
             <div className="p-4 overflow-y-auto flex-1 text-xs">
               <EmailDetail
                 email={selectedEmail}
+                applications={applications}
                 onChangeClassification={(next) => handleChangeClassification(selectedEmail.id, next)}
+                onChangeApplication={(next) => handleChangeApplication(selectedEmail.id, next)}
                 onReanalyze={() => handleReanalyze(selectedEmail.id)}
                 reanalyzing={reanalyzingId === selectedEmail.id}
+                linking={linkingId === selectedEmail.id}
                 onOpenApplication={(id) => {
                   onSelectApplication(id)
                   setSelectedId(null)
