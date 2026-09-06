@@ -156,7 +156,7 @@ export function Sidebar({
           </div>
         </div>
         <div className="text-3xs text-[var(--color-faint)] font-mono truncate">
-          your-app.your-tailnet.ts.net
+          {process.env.NEXT_PUBLIC_TAILSCALE_URL?.replace(/^https?:\/\//, "") || "Not configured"}
         </div>
         <div className="flex items-center justify-between text-3xs pt-1 border-t border-[var(--color-line-soft)] text-[var(--color-muted)]">
           <span>Supabase Postgres</span>

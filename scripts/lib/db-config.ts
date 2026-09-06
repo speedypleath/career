@@ -38,6 +38,8 @@ const LOCAL_DEFAULTS = {
 const SUPABASE_POOLER_DEFAULTS = {
   host: "aws-1-eu-west-1.pooler.supabase.com",
   port: 5432,
+  // A placeholder, not a real project — PGUSER (set via .env, which
+  // interpolates it from SUPABASE_PROJECT_REF) always overrides this.
   user: "postgres.your-project-ref",
   database: "postgres",
 }
