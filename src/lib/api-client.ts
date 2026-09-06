@@ -167,6 +167,24 @@ export async function setFollowUpDone(id: string, done: boolean): Promise<EmailL
   return data.email
 }
 
+export interface CustomFollowUpInput {
+  title: string
+  link: string
+  company?: string
+  notes?: string
+  classification?: string
+  application_id?: string | null
+}
+
+/** Create a follow-up that never came from a real email — see src/app/api/follow-ups/route.ts. */
+export async function createFollowUp(input: CustomFollowUpInput): Promise<EmailLog> {
+  const data = await request<{ email: EmailLog }>("/api/follow-ups", {
+    method: "POST",
+    body: json(input),
+  })
+  return data.email
+}
+
 export interface ScanResult {
   scannedCount: number
   matchedCount: number
