@@ -4,8 +4,8 @@ import { cx, getStatusColor } from "../format"
 import type { ApplicationStatus } from "@/types"
 
 /**
- * The stages worth one click. `wishlist` and `archived` are deliberately absent
- * — they are not steps along the way, and the edit form still reaches them.
+ * The stages worth one click. `archived` is deliberately absent — it is not a
+ * step along the way, and the edit form still reaches it.
  */
 const STEPS: { id: ApplicationStatus; label: string }[] = [
   { id: "applied", label: "Applied" },
@@ -15,6 +15,12 @@ const STEPS: { id: ApplicationStatus; label: string }[] = [
   { id: "offer", label: "Offer 🎉" },
   { id: "rejected", label: "Rejected" },
 ]
+
+/**
+ * `wishlist` is not a pipeline step — it sits before `applied` — so it gets its
+ * own one-click affordance, set off from the linear steps.
+ */
+const WISHLIST: { id: ApplicationStatus; label: string } = { id: "wishlist", label: "Wishlist" }
 
 interface StatusStepperProps {
   status: ApplicationStatus | undefined
@@ -45,6 +51,19 @@ export function StatusStepper({ status, onChange }: StatusStepperProps) {
 
       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
         <span className="mr-1 hidden sm:inline text-[var(--color-faint)]">Move to</span>
+        <button
+          key={WISHLIST.id}
+          onClick={() => onChange(WISHLIST.id)}
+          className={cx(
+            "rounded border px-2 py-0.5 text-3xs whitespace-nowrap shrink-0 transition-colors",
+            status === WISHLIST.id
+              ? "border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-[var(--color-accent)] font-semibold"
+              : "border-[var(--color-line)] text-[var(--color-faint)] hover:border-[var(--color-muted)] hover:text-[var(--color-fg)]",
+          )}
+        >
+          {WISHLIST.label}
+        </button>
+        <span className="mx-0.5 h-3 w-px shrink-0 bg-[var(--color-line)]" />
         {STEPS.map((step) => (
           <button
             key={step.id}
