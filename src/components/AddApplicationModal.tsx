@@ -253,7 +253,7 @@ export function AddApplicationModal({ isOpen, onClose, onCreated }: AddApplicati
             <label className="mb-1.5 block text-2xs text-[var(--color-faint)]">What you sent them</label>
             <textarea
               rows={2}
-              placeholder="e.g. CV: andrei-gheorghe-cv.pdf, Notice: immediate, Expected salary: €70k"
+              placeholder="e.g. CV: resume.pdf, Notice: immediate, Expected salary: €70k"
               value={infoProvided}
               onChange={(e) => setInfoProvided(e.target.value)}
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-bg)] p-3 text-xs text-[var(--color-fg)] placeholder-[var(--color-faint)] focus:border-[var(--color-accent)] focus:outline-none font-mono"

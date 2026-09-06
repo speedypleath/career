@@ -80,13 +80,13 @@ create an OAuth client with the `auth_keys` scope and the now-selectable
 
 ### 3. SSH on the mini
 
-- Mini: System Settings → General → Sharing → Remote Login → On, limited to user `speedypleath`.
+- Mini: System Settings → General → Sharing → Remote Login → On, limited to user `youruser`.
 - On a trusted machine: `ssh-keygen -t ed25519 -f career-ci -N "" -C "career-ci"`.
 - Append `career-ci.pub` to the mini's `~/.ssh/authorized_keys`.
 - Verify from another tailnet device:
-  `ssh -i career-ci speedypleath@andreis-mac-mini.taile5b997.ts.net 'echo ok'`.
+  `ssh -i career-ci youruser@your-mini.your-tailnet.ts.net 'echo ok'`.
 - Capture the host key for pinning:
-  `ssh-keyscan -t ed25519 andreis-mac-mini.taile5b997.ts.net`.
+  `ssh-keyscan -t ed25519 your-mini.your-tailnet.ts.net`.
 
 ### 4. GitHub `production` Environment
 
@@ -114,9 +114,9 @@ Same page → **Variables**.
 
 | Variable | Value |
 |---|---|
-| `SUPABASE_PROJECT_REF` | `mvmteuwwvahkicsybxsl` |
-| `MINI_SSH_HOST` | `andreis-mac-mini.taile5b997.ts.net` |
-| `MINI_SSH_USER` | `speedypleath` |
+| `SUPABASE_PROJECT_REF` | `your-project-ref` |
+| `MINI_SSH_HOST` | `your-mini.your-tailnet.ts.net` |
+| `MINI_SSH_USER` | `youruser` |
 
 ### 7. Reconcile Supabase migration history
 
@@ -124,7 +124,7 @@ So the first automated `db push` is a no-op:
 
 ```bash
 set -a; . ./.env; set +a
-npx supabase@latest link --project-ref mvmteuwwvahkicsybxsl
+npx supabase@latest link --project-ref your-project-ref
 npx supabase@latest migration list --linked
 ```
 
@@ -154,7 +154,7 @@ reconcile with `npx supabase@latest migration repair`.
    curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8098/        # 200
    ```
 6. Unauthenticated `GET` of
-   `https://mvmteuwwvahkicsybxsl.supabase.co/functions/v1/email-classifier-worker`
+   `https://your-project-ref.supabase.co/functions/v1/email-classifier-worker`
    returns `401` (deployed, env present) — not `404` (not deployed) or `503`
    with `has*: false` (Cloudflare secrets did not take).
 
@@ -163,7 +163,7 @@ reconcile with `npx supabase@latest migration repair`.
 **App** — redeploy a known-good commit on the mini:
 
 ```bash
-ssh speedypleath@andreis-mac-mini.taile5b997.ts.net \
+ssh youruser@your-mini.your-tailnet.ts.net \
   'cd ~/Projects/career && git fetch origin && git checkout -f -B main <good-sha> && \
    set -a; . ./.env; set +a && npm ci && npm run build && \
    launchctl kickstart -k gui/$(id -u)/com.openclaw.career'

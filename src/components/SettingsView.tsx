@@ -6,7 +6,6 @@ import { ErrorBanner } from "./ErrorBanner"
 import { Skeleton } from "./Skeleton"
 import { updateEmailSettings } from "@/lib/api-client"
 import { useEmailSettings } from "@/hooks/useEmailSettings"
-import { OWNER_EMAIL } from "@/lib/owner"
 import type { EmailSettings } from "@/types"
 
 const SAVED_MS = 3_000
@@ -26,7 +25,12 @@ interface SettingsFormProps {
  * password alone", never "clear it".
  */
 function SettingsForm({ settings, onSaved, onError }: SettingsFormProps) {
-  const [gmailAccount, setGmailAccount] = useState(settings.gmail_account || OWNER_EMAIL)
+  // settings.gmail_account is never actually empty — the repository falls
+  // back to OWNER_EMAIL server-side before this prop ever reaches the client
+  // (src/lib/repositories/settings.ts). No client-side fallback needed here,
+  // which also avoids reading OWNER_EMAIL (a non-NEXT_PUBLIC_ env var) in
+  // client-rendered code, where it would silently read as undefined.
+  const [gmailAccount, setGmailAccount] = useState(settings.gmail_account)
   const [imapHost, setImapHost] = useState(settings.imap_host || "imap.gmail.com")
   const [imapPort, setImapPort] = useState(settings.imap_port || 993)
   const [imapPassword, setImapPassword] = useState("")
@@ -45,7 +49,7 @@ function SettingsForm({ settings, onSaved, onError }: SettingsFormProps) {
         gmail_account: gmailAccount,
         imap_host: imapHost,
         imap_port: imapPort,
-        imap_user: settings.imap_user || OWNER_EMAIL,
+        imap_user: settings.imap_user || gmailAccount,
         imap_password: imapPassword || undefined,
         auto_sync: settings.auto_sync ?? true,
         sync_interval_mins: syncInterval,
@@ -141,7 +145,9 @@ function SettingsForm({ settings, onSaved, onError }: SettingsFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="rounded border border-[var(--color-line-soft)] bg-[var(--color-bg)] p-3 space-y-1">
             <span className="text-3xs text-[var(--color-faint)]">Reachable at</span>
-            <div className="font-mono text-[var(--color-fg)]">career.taile5b997.ts.net</div>
+            <div className="font-mono text-[var(--color-fg)]">
+              {process.env.NEXT_PUBLIC_TAILSCALE_URL?.replace(/^https?:\/\//, "") || "Not configured"}
+            </div>
             <div className="text-3xs text-emerald-400">Served over Tailscale</div>
           </div>
 

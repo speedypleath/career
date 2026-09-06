@@ -17,7 +17,7 @@ export const GET = handle("Failed to describe the webhook", async () => {
       url: "https://www.linkedin.com/jobs/view/4454799256",
       location: "Eindhoven, Netherlands",
       job_description: "Audio signal processing algorithms for hearing aids...",
-      info_provided: "Resume: Andrei_Gheorghe_CV.pdf, Notice Period: Immediate",
+      info_provided: "Resume: resume.pdf, Notice Period: Immediate",
       cover_letter: "Dear Hiring Team at GN Hearing...",
       salary: "€65,000 - €80,000",
       contact_email: "careers@gn.com",

@@ -8,11 +8,16 @@ import { EmailFilters } from "./emails/EmailFilters"
 import { EmailRow } from "./emails/EmailRow"
 import { IngestEmailModal } from "./emails/IngestEmailModal"
 import { cx } from "./format"
-import { getApplications, linkEmailToApplication, reanalyzeEmail, setEmailClassification } from "@/lib/api-client"
+import {
+  getApplications,
+  getEmailSettings,
+  linkEmailToApplication,
+  reanalyzeEmail,
+  setEmailClassification,
+} from "@/lib/api-client"
 import { useAsync } from "@/hooks/useAsync"
 import { useEmailLogs } from "@/hooks/useEmailLogs"
-import { OWNER_EMAIL } from "@/lib/owner"
-import type { Application, EmailLog } from "@/types"
+import type { Application, EmailLog, EmailSettings } from "@/types"
 
 interface EmailsViewProps {
   onScanEmails: () => void | Promise<void>
@@ -40,6 +45,13 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
   } = useEmailLogs()
 
   const { data: applications } = useAsync<Application[]>(useCallback(() => getApplications(), []), [])
+  // gmail_account is never actually empty (the repository falls back to
+  // OWNER_EMAIL server-side), and fetching it here avoids reading OWNER_EMAIL
+  // in client-rendered code, where a non-NEXT_PUBLIC_ env var reads undefined.
+  const { data: emailSettings } = useAsync<EmailSettings | null>(
+    useCallback(() => getEmailSettings(), []),
+    null,
+  )
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showIngest, setShowIngest] = useState(false)
@@ -116,9 +128,11 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-fg)]">Inbox</h1>
-            <span className="inline-flex items-center gap-1 rounded bg-[var(--color-accent)]/10 px-2 py-0.5 text-3xs font-semibold text-[var(--color-accent)] border border-[var(--color-accent)]/20">
-              <Mail className="h-3 w-3" /> {OWNER_EMAIL}
-            </span>
+            {emailSettings?.gmail_account && (
+              <span className="inline-flex items-center gap-1 rounded bg-[var(--color-accent)]/10 px-2 py-0.5 text-3xs font-semibold text-[var(--color-accent)] border border-[var(--color-accent)]/20">
+                <Mail className="h-3 w-3" /> {emailSettings.gmail_account}
+              </span>
+            )}
           </div>
           <p className="text-xs text-[var(--color-muted)]">
             Every message the scanner has read, and what it decided each one was.

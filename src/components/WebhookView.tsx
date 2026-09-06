@@ -10,8 +10,12 @@ import { useWebhookInfo } from "@/hooks/useWebhookInfo"
 
 const COPIED_MS = 2_000
 
-/** The Tailscale name of the machine the launchd job runs on. */
-const TAILSCALE_HOST = "https://andreis-mac-mini.taile5b997.ts.net"
+/**
+ * The Tailscale name of the machine the launchd job runs on, if this instance
+ * is reachable that way. Unset (the default in .env.example) just hides the
+ * "Over Tailscale" card below rather than showing a URL that doesn't work.
+ */
+const TAILSCALE_HOST = process.env.NEXT_PUBLIC_TAILSCALE_URL || null
 const LOCAL_HOST = "http://127.0.0.1:8098"
 
 /**
@@ -21,15 +25,15 @@ const LOCAL_HOST = "http://127.0.0.1:8098"
 const TEST_DEFAULTS = {
   application_method: "portal",
   status: "applied",
-  url: "https://jobs.sennheiser.com/dsp-engineer",
+  url: "https://jobs.example.com/software-engineer",
   salary: "€75,000 - €90,000",
   priority: "high",
-  cover_letter: "Applied via automated Bucharest sweep script. Included Andrei Gheorghe Audio CV.",
-  info_provided: "CV: andrei-gheorghe-cv.pdf, Notice: immediate, Location: Bucharest",
-  source: "audio-job-hunter-cron",
+  cover_letter: "Applied via automated job-search sweep script. Included resume.",
+  info_provided: "CV: resume.pdf, Notice: immediate, Location: Remote",
+  source: "job-hunter-cron",
 }
 
-const PYTHON_SNIPPET = `# Add this to the audio-job-hunter sweep whenever an application is submitted:
+const PYTHON_SNIPPET = `# Add this to your job-hunter sweep whenever an application is submitted:
 import requests
 
 def notify_career_app(job_info):
@@ -42,12 +46,12 @@ def notify_career_app(job_info):
         "application_method": job_info.get("method", "portal"), # "portal" | "email"
         "url": job_info.get("url", ""),
         "job_description": job_info.get("description", ""),
-        "info_provided": job_info.get("info_provided", "CV: andrei-gheorghe-cv.pdf"),
+        "info_provided": job_info.get("info_provided", "CV: resume.pdf"),
         "cover_letter": job_info.get("cover_letter", ""),
         "salary": job_info.get("salary", ""),
         "contact_email": job_info.get("contact_email", ""),
         "priority": job_info.get("priority", "high"),
-        "source": "audio-job-hunter-cron"
+        "source": "job-hunter-cron"
     }
     try:
         r = requests.post(webhook_url, json=payload, timeout=5)
@@ -106,8 +110,8 @@ export function WebhookView() {
   const [testError, setTestError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
 
-  const [company, setCompany] = useState("Sennheiser Romania")
-  const [title, setTitle] = useState("DSP / Audio Software Engineer")
+  const [company, setCompany] = useState("Example Corp")
+  const [title, setTitle] = useState("Software Engineer")
   const [workplace, setWorkplace] = useState("hybrid")
 
   // "POST /api/webhook/application" -> "/api/webhook/application"
@@ -164,12 +168,14 @@ export function WebhookView() {
           copied={copied === "local-url"}
           onCopy={() => copy(`${LOCAL_HOST}${path}`, "local-url")}
         />
-        <EndpointCard
-          title="Over Tailscale"
-          url={path && `${TAILSCALE_HOST}${path}`}
-          copied={copied === "ts-url"}
-          onCopy={() => copy(`${TAILSCALE_HOST}${path}`, "ts-url")}
-        />
+        {TAILSCALE_HOST && (
+          <EndpointCard
+            title="Over Tailscale"
+            url={path && `${TAILSCALE_HOST}${path}`}
+            copied={copied === "ts-url"}
+            onCopy={() => copy(`${TAILSCALE_HOST}${path}`, "ts-url")}
+          />
+        )}
       </div>
 
       <div className="rounded-[var(--radius-panel)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 space-y-4">

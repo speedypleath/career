@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS email_settings (
   imap_user TEXT DEFAULT '',
   imap_password TEXT DEFAULT '',
   imap_tls BOOLEAN DEFAULT TRUE,
-  gmail_account TEXT DEFAULT 'gheorgheandrei13@gmail.com',
+  gmail_account TEXT DEFAULT 'owner@example.com',
   auto_sync BOOLEAN DEFAULT TRUE,
   sync_interval_mins INTEGER DEFAULT 60,
   last_synced_at TIMESTAMPTZ,
@@ -100,9 +100,11 @@ CREATE TABLE IF NOT EXISTS email_summaries (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed default email settings if not present
+-- Seed default email settings if not present. 'owner@example.com' is a
+-- placeholder only — set the real address via email_settings.gmail_account
+-- (Settings tab in the UI), which always wins over this default.
 INSERT INTO email_settings (id, gmail_account)
-VALUES ('default', 'gheorgheandrei13@gmail.com')
+VALUES ('default', 'owner@example.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- Indexes for performance

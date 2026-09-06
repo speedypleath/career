@@ -1,5 +1,13 @@
 import { ATS_DOMAINS as CLASSIFIER_ATS_DOMAINS } from "../email-classifier.ts"
 import { BLACKLISTED_COMPANY_NAMES } from "./status.ts"
+import { OWNER_NAME } from "../owner.ts"
+
+// Matches any word of the owner's own name, e.g. "Alex Doe" -> /alex|doe/i.
+// Guards a job-title heuristic below against picking up the applicant's own
+// name from a subject line. Null (OWNER_NAME unset) just disables the guard.
+const ownerNamePattern = OWNER_NAME.trim()
+  ? new RegExp(OWNER_NAME.trim().split(/\s+/).join("|"), "i")
+  : null
 
 export function isAtsSender(sender: string): boolean {
   const lower = (sender || "").toLowerCase()
@@ -34,7 +42,7 @@ export function extractCompanyName(subject: string, sender: string, body: string
     if (s !== "Unknown Company") return s
   }
 
-  // 2. LinkedIn Easy Apply: "Andrei, your application was sent to <Company>"
+  // 2. LinkedIn Easy Apply: "Alex, your application was sent to <Company>"
   m = subject.match(/application was sent to\s+([^!.,\n]+)/i)
   if (m && m[1].trim().length > 1) {
     const s = sanitizeCompany(m[1])
@@ -175,13 +183,13 @@ export function extractJobTitle(subject: string, body: string): string {
     return m[1].trim()
   }
 
-  // "Technical Interview | Andrei Gheorghe | Full Stack Developer @ ..."
+  // "Technical Interview | Alex Doe | Full Stack Developer @ ..."
   if (subject.includes("|")) {
     const parts = subject.split("|").map(s => s.trim())
     for (const part of parts) {
       if (
         /engineer|developer|architect|lead|manager|analyst|designer/i.test(part) &&
-        !/andrei|gheorghe/i.test(part)
+        !(ownerNamePattern && ownerNamePattern.test(part))
       ) {
         const cleaned = part.split("@")[0].trim()
         if (cleaned.length > 3) return cleaned

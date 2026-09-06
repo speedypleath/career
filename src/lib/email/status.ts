@@ -1,5 +1,6 @@
 import type { EmailClassification } from "../email-classifier.ts"
 import type { ApplicationStatus } from "../../types.ts"
+import { OWNER_EMAIL, OWNER_NAME } from "../owner.ts"
 
 /**
  * The application status a freshly classified email implies.
@@ -50,6 +51,13 @@ export function shouldAdvanceStatus(current: string | undefined, next: Applicati
   return (STATUS_RANK[next] ?? 0) > (STATUS_RANK[current] ?? 0)
 }
 
+/**
+ * The owner's own name and email local-part are in here too — a company
+ * "extracted" as the applicant's own name is always a misparse, not a real
+ * employer. Derived from OWNER_EMAIL/OWNER_NAME (see ../owner.ts) rather than
+ * hardcoded, since this repo is public; both are optional, so a fresh install
+ * with neither set just skips those two entries.
+ */
 export const BLACKLISTED_COMPANY_NAMES = new Set([
   "unknown company",
   "unknown role",
@@ -64,8 +72,6 @@ export const BLACKLISTED_COMPANY_NAMES = new Set([
   "joburi hipo.ro",
   "hipo",
   "hipo.ro",
-  "andrei gheorghe",
-  "gheorgheandrei13",
   "smartrecruiters",
   "greenhouse",
   "workable",
@@ -76,4 +82,6 @@ export const BLACKLISTED_COMPANY_NAMES = new Set([
   "ismir",
   "news",
   "newsletter",
+  ...(OWNER_NAME ? [OWNER_NAME.toLowerCase()] : []),
+  ...(OWNER_EMAIL.includes("@") ? [OWNER_EMAIL.split("@")[0].toLowerCase()] : []),
 ])
