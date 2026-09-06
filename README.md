@@ -106,10 +106,13 @@ instruction in `errors[]` and the UI shows it in a banner.
 
 ## Deploying
 
-`main` is deployed automatically by `.github/workflows/deploy.yml` — `verify`
-(lint, build type-gate, tests) on every PR, then `supabase` (migrations, edge
-function, Cloudflare secrets) and `deploy` (Tailscale + SSH redeploy on the Mac
-mini) on every push to `main`. Setup, first run, and rollback are in
+`main` is deployed automatically by `.github/workflows/deploy.yml`. On every PR:
+`verify` (lint, OpenAPI lint, build type-gate, tests) and `security`
+(`audit-ci` dependency scan against `audit-ci.jsonc`). On every push to `main`,
+after both pass: `supabase` (migrations, edge function, Cloudflare secrets) then
+`deploy` (Tailscale + SSH redeploy on the Mac mini, which ends with a health
+check). Third-party actions are pinned to commit SHAs and kept current by
+Dependabot (`.github/dependabot.yml`). Setup, first run, and rollback are in
 [`docs/deploy.md`](docs/deploy.md).
 
 ## Data model
@@ -153,13 +156,21 @@ changes against the stored corpus before shipping them:
 | `/api/applications/[id]` | `GET`, `PATCH`, `DELETE` | Read, update, remove one |
 | `/api/stats` | `GET` | Counts, funnel and recent events for the overview |
 | `/api/email/logs` | `GET`, `PATCH` | Scanned mail; `PATCH` records a manual classification |
-| `/api/email/scan` | `GET` | Run a Gmail scan; `POST` logs a single message |
+| `/api/email/scan` | `GET`, `POST` | `GET` runs a Gmail scan; `POST` ingests one message |
+| `/api/email/reanalyze` | `POST` | Re-classify one email, or every email on an application |
 | `/api/email/settings` | `GET`, `PATCH` | Gmail/IMAP settings |
+| `/api/follow-ups` | `POST` | Create a custom (non-email) follow-up item |
 | `/api/webhook/application` | `GET`, `POST` | Ingest an application from an external source |
+| `/api/openapi`, `/api/docs` | `GET` | The OpenAPI 3.1 spec, and Swagger UI over it |
 
 `/api/email/scan` returns `scannedCount`, `matchedCount`, `skippedCount` and
 `newEmails[]`, plus a non-fatal `errors[]` — an empty result with a populated
 `errors[]` means the scan was blocked, not that there was no mail.
+
+The full contract — every field, status code and deliberate quirk — lives in
+[`docs/openapi.yaml`](docs/openapi.yaml). `npm run lint:openapi` validates it
+(also enforced in CI); a running instance serves Swagger UI at
+[`/api/docs`](http://localhost:8098/api/docs).
 
 ## Scripts
 
