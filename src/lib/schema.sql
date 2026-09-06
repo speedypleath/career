@@ -118,4 +118,8 @@ CREATE INDEX IF NOT EXISTS idx_application_events_app_id ON application_events(a
 CREATE INDEX IF NOT EXISTS idx_email_logs_message_id ON email_logs(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_app_id ON email_logs(application_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_classification_state ON email_logs(classification_state, created_at DESC);
+-- Matches the Follow-ups tab query exactly (WHERE + ORDER BY) — see
+-- supabase/migrations/202609060003_email_logs_follow_up_index.sql.
+CREATE INDEX IF NOT EXISTS idx_email_logs_follow_up ON email_logs(received_at DESC, created_at DESC)
+  WHERE follow_up_done = false AND classification IN ('assessment', 'question', 'interview');
 CREATE INDEX IF NOT EXISTS idx_email_summaries_email_log_id ON email_summaries(email_log_id);
