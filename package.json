@@ -46,7 +46,7 @@
     "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.12",
-    "typescript": "^5"
+    "typescript": "^7"
   },
   "allowScripts": {
     "@parcel/watcher@2.6.0": true,
