@@ -109,3 +109,46 @@ model email_summaries {
 
   @@index([email_log_id], map: "idx_email_summaries_email_log_id")
 }
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model email_classification_cache {
+  prompt_hash       String   @id
+  classification    String
+  prompt_tokens     Int?
+  completion_tokens Int?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  expires_at        DateTime @default(dbgenerated("(now() + '30 days'::interval)")) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sync_events {
+  id                BigInt    @id @default(autoincrement())
+  dedupe_key        String    @unique
+  source            String
+  event_name        String
+  vikunja_task_id   BigInt?
+  workboard_card_id String?
+  payload           Json
+  processed_at      DateTime? @db.Timestamptz(6)
+  error             String?
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at], map: "sync_events_pending_idx", where: raw("(processed_at IS NULL)"))
+  @@index([vikunja_task_id], map: "sync_events_vikunja_idx", where: raw("(vikunja_task_id IS NOT NULL)"))
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sync_mapping {
+  id                   BigInt    @id @default(autoincrement())
+  vikunja_task_id      BigInt    @unique
+  workboard_card_id    String?   @unique
+  vikunja_updated_at   DateTime? @db.Timestamptz(6)
+  workboard_updated_at DateTime? @db.Timestamptz(6)
+  last_synced_hash     String?
+  last_synced_at       DateTime? @default(now()) @db.Timestamptz(6)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
+}
