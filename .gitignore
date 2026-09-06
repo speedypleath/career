@@ -49,3 +49,6 @@ bun.lock
 
 # superpowers planning docs (local only)
 /docs/superpowers/
+
+# GSD planning docs (local only)
+/.planning/
