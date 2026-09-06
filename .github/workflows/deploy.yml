@@ -12,11 +12,17 @@ env:
   # (postinstall). CI never connects — a syntactically valid placeholder is enough.
   DATABASE_URL: "postgresql://user:pass@localhost:5432/career"
 
+# Least privilege by default — only the supabase job (schema-sync commit)
+# needs to write to the repo, and declares its own override for that.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     concurrency:
-      group: verify-${{ github.ref }}
+      group: ${{ github.workflow }}-verify-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +44,13 @@ jobs:
     environment: production
     permissions:
       contents: write   # needed to push the Prisma schema-sync commit below
+    timeout-minutes: 15
+    # Serialized, never cancelled mid-migration — same reasoning as deploy's
+    # group below. One hosted database: two overlapping runs must queue, not
+    # race `supabase db push` or the schema-sync git push against each other.
+    concurrency:
+      group: ${{ github.workflow }}-supabase-migrate
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -121,8 +134,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 10
     concurrency:
-      group: deploy-mini
+      group: ${{ github.workflow }}-deploy-mini
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
