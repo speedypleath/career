@@ -100,7 +100,9 @@ CREATE TABLE IF NOT EXISTS email_summaries (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed default email settings if not present
+-- Seed default email settings if not present. 'owner@example.com' is a
+-- placeholder only — set the real address via email_settings.gmail_account
+-- (Settings tab in the UI), which always wins over this default.
 INSERT INTO email_settings (id, gmail_account)
 VALUES ('default', 'owner@example.com')
 ON CONFLICT (id) DO NOTHING;

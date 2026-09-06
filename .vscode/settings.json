@@ -24,17 +24,10 @@
     ".next": true,
     "node_modules": true,
     "prisma/schema.prisma": false
-  },
-  "sqltools.connections": [
-    {
-      "ssh": "Disabled",
-      "previewLimit": 50,
-      "server": "localhost",
-      "port": 5432,
-      "driver": "PostgreSQL",
-      "name": "career",
-      "database": "career",
-      "username": "youruser"
-    }
-  ]
+  }
+  // A personal SQLTools connection (local Postgres, username = your OS user)
+  // used to live here as "sqltools.connections". It's local machine config,
+  // not something a fork needs, so add your own via the SQLTools extension's
+  // UI instead (Cmd+Shift+P > "SQLTools: Add New Connection") — it stores
+  // connections in your user settings, not this shared workspace file.
 }
