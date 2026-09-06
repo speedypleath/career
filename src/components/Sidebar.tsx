@@ -5,7 +5,7 @@ import {
   Briefcase,
   Columns3,
   Mail,
-  Webhook,
+  CheckSquare,
   Settings,
   Plus,
   Compass,
@@ -22,6 +22,7 @@ interface SidebarProps {
   onOpenAddModal: () => void
   totalCount?: number
   emailCount?: number
+  followUpCount?: number
   onRefreshAll?: () => void
   isRefreshing?: boolean
   isMobileOpen?: boolean
@@ -34,6 +35,7 @@ export function Sidebar({
   onOpenAddModal,
   totalCount = 0,
   emailCount = 0,
+  followUpCount = 0,
   onRefreshAll,
   isRefreshing = false,
   isMobileOpen = false,
@@ -44,7 +46,7 @@ export function Sidebar({
     { id: "applications", label: "Applications", icon: Briefcase, badge: totalCount },
     { id: "kanban", label: "Pipeline Board", icon: Columns3 },
     { id: "emails", label: "Emails", icon: Mail, badge: emailCount },
-    { id: "webhook", label: "Webhook & Cron", icon: Webhook },
+    { id: "followups", label: "Follow-ups", icon: CheckSquare, badge: followUpCount },
     { id: "settings", label: "Settings", icon: Settings },
   ]
 

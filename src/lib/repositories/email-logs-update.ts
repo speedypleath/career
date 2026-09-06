@@ -11,6 +11,7 @@
 export interface LogPatch {
   application_id?: string | null
   classification?: string
+  follow_up_done?: boolean
 }
 
 /**
@@ -34,6 +35,10 @@ export function buildLogUpdate(patch: LogPatch): Record<string, unknown> | null 
 
   if (patch.application_id !== undefined) {
     data.application_id = patch.application_id || null
+  }
+
+  if (patch.follow_up_done !== undefined) {
+    data.follow_up_done = patch.follow_up_done
   }
 
   if (patch.classification !== undefined) {

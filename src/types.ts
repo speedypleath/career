@@ -87,6 +87,8 @@ export interface EmailLog {
   classified_at?: string | null
   /** Set when a human corrects the classification; rescans must not overwrite it. */
   manual_override: boolean
+  /** Persisted dismissal for the Follow-ups tab. */
+  follow_up_done: boolean
   received_at: string
   created_at: string
   company?: string
@@ -127,4 +129,4 @@ export interface Stats {
   recentEvents: (ApplicationEvent & { company?: string; title_job?: string })[]
 }
 
-export type TabId = "overview" | "applications" | "kanban" | "emails" | "webhook" | "settings"
+export type TabId = "overview" | "applications" | "kanban" | "emails" | "followups" | "settings"

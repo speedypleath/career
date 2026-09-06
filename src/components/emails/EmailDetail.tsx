@@ -15,6 +15,8 @@ interface EmailDetailProps {
   linking: boolean
   onOpenApplication: (applicationId: string) => void
   bodyClassName?: string
+  onToggleFollowUp?: (done: boolean) => void
+  followUpBusy?: boolean
 }
 
 /**
@@ -34,9 +36,27 @@ export function EmailDetail({
   linking,
   onOpenApplication,
   bodyClassName = "max-h-64",
+  onToggleFollowUp,
+  followUpBusy,
 }: EmailDetailProps) {
   return (
     <div className="space-y-4">
+      {onToggleFollowUp && (
+        <div className="flex items-center justify-between rounded border border-[var(--color-line)] bg-[var(--color-surface-hi)] px-3 py-2">
+          <span className="text-2xs text-[var(--color-muted)]">
+            {email.follow_up_done ? "Marked as handled" : "Needs a follow-up"}
+          </span>
+          <button
+            type="button"
+            onClick={() => onToggleFollowUp(!email.follow_up_done)}
+            disabled={followUpBusy}
+            className="rounded border border-[var(--color-line)] px-2 py-1 text-2xs text-[var(--color-fg)] hover:border-[var(--color-accent)] disabled:opacity-50 transition-colors"
+          >
+            {email.follow_up_done ? "Mark as needing follow-up" : "Mark as handled"}
+          </button>
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-2">
         <div>
           <span className="text-3xs text-[var(--color-faint)]">Classification</span>

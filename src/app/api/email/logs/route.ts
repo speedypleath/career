@@ -8,6 +8,7 @@ export const GET = handle("Failed to fetch email logs", async (request: Request)
     classification: searchParams.get("classification"),
     search: searchParams.get("search"),
     excludeUnrelated: searchParams.get("excludeUnrelated") === "true",
+    needsFollowUp: searchParams.get("needsFollowUp") === "true",
   })
   return ok({ emails })
 })

@@ -16,7 +16,7 @@ import { OverviewView } from "@/components/OverviewView"
 import { ApplicationsView } from "@/components/ApplicationsView"
 import { KanbanView } from "@/components/KanbanView"
 import { EmailsView } from "@/components/EmailsView"
-import { WebhookView } from "@/components/WebhookView"
+import { FollowUpsView } from "@/components/FollowUpsView"
 import { SettingsView } from "@/components/SettingsView"
 import { AddApplicationModal } from "@/components/AddApplicationModal"
 import { ApplicationDetailModal } from "@/components/ApplicationDetailModal"
@@ -26,6 +26,7 @@ import { StatusDot } from "@/components/StatusDot"
 import { cx } from "@/components/format"
 import { scanEmails, updateApplicationStatus } from "@/lib/api-client"
 import { useDashboard } from "@/hooks/useApplications"
+import { useFollowUps } from "@/hooks/useFollowUps"
 import type { TabId, ApplicationStatus } from "@/types"
 
 export default function Home() {
@@ -37,6 +38,7 @@ export default function Home() {
   // The fifteen-second poll and the window-focus refetch live in the hook now.
   const { data, loading, refreshing: isRefreshing, error, reload: loadData, setError } = useDashboard()
   const { applications, stats } = data
+  const followUps = useFollowUps()
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -132,6 +134,7 @@ export default function Home() {
         onOpenAddModal={() => setIsAddModalOpen(true)}
         totalCount={applications.length}
         emailCount={emailAlertCount}
+        followUpCount={followUps.data.length}
         onRefreshAll={() => loadData(false)}
         isRefreshing={isRefreshing}
         isMobileOpen={isMobileMenuOpen}
@@ -204,7 +207,9 @@ export default function Home() {
               />
             )}
 
-            {activeTab === "webhook" && <WebhookView />}
+            {activeTab === "followups" && (
+              <FollowUpsView followUps={followUps} onSelectApplication={(id) => setSelectedAppId(id)} />
+            )}
 
             {activeTab === "settings" && <SettingsView />}
             </>
@@ -268,7 +273,7 @@ export default function Home() {
           onClick={() => setIsMobileMenuOpen(true)}
           className={cx(
             "flex flex-col items-center gap-0.5 py-1 px-2.5 rounded text-3xs font-medium transition-colors",
-            activeTab === "webhook" || activeTab === "settings"
+            activeTab === "settings" || activeTab === "followups"
               ? "text-[var(--color-accent)] font-semibold"
               : "text-[var(--color-faint)]"
           )}

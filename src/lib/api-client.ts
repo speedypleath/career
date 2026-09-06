@@ -119,6 +119,7 @@ export interface EmailQuery {
   classification?: string
   search?: string
   excludeUnrelated?: boolean
+  needsFollowUp?: boolean
 }
 
 export async function getEmailLogs(query: EmailQuery = {}): Promise<EmailLog[]> {
@@ -153,6 +154,15 @@ export async function linkEmailToApplication(
   const data = await request<{ email: EmailLog }>("/api/email/logs", {
     method: "PATCH",
     body: json({ id, application_id: applicationId }),
+  })
+  return data.email
+}
+
+/** Marks (or unmarks) a follow-up as handled — persisted, independent of classification. */
+export async function setFollowUpDone(id: string, done: boolean): Promise<EmailLog> {
+  const data = await request<{ email: EmailLog }>("/api/email/logs", {
+    method: "PATCH",
+    body: json({ id, follow_up_done: done }),
   })
   return data.email
 }
