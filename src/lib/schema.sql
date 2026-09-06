@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS email_logs (
   classified_at TIMESTAMPTZ,
   -- Set when a human corrects the classification in the UI. Rescans leave these rows alone.
   manual_override BOOLEAN DEFAULT FALSE,
+  -- Persisted dismissal for the Follow-ups tab. Independent of classification/manual_override.
+  follow_up_done BOOLEAN NOT NULL DEFAULT FALSE,
   received_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -64,6 +66,7 @@ ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classifier_prompt_tokens INTEGER
 ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classifier_completion_tokens INTEGER;
 ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classification_error TEXT;
 ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS classified_at TIMESTAMPTZ;
+ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS follow_up_done BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS email_classification_cache (
   prompt_hash TEXT PRIMARY KEY,

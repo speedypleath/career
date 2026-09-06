@@ -48,3 +48,11 @@ test("both fields together set the link and the override", () => {
   assert.equal(data.classification, "offer")
   assert.equal(data.manual_override, true)
 })
+
+test("marking a follow-up done does not touch classification or the override flag", () => {
+  const data = buildLogUpdate({ follow_up_done: true })
+  assert.ok(data)
+  assert.equal(data.follow_up_done, true)
+  assert.equal("manual_override" in data, false)
+  assert.equal("classification" in data, false)
+})

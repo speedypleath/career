@@ -15,7 +15,11 @@ export interface LogFilters {
   classification?: string | null
   search?: string | null
   excludeUnrelated?: boolean
+  needsFollowUp?: boolean
 }
+
+/** Classifications that put an email on the Follow-ups tab — a direct ask or a scheduling reply. */
+const FOLLOW_UP_CLASSIFICATIONS = ["assessment", "question", "interview"]
 
 /**
  * Deliberately raw SQL, not Prisma.
@@ -45,6 +49,11 @@ export async function findAll(filters: LogFilters = {}): Promise<EmailLogWithApp
     conditions.push(
       `(m.sender ILIKE ${p} OR m.subject ILIKE ${p} OR m.snippet ILIKE ${p} OR a.company ILIKE ${p})`,
     )
+  }
+
+  if (filters.needsFollowUp) {
+    params.push(FOLLOW_UP_CLASSIFICATIONS)
+    conditions.push(`m.classification = ANY($${params.length}) AND m.follow_up_done = false`)
   }
 
   params.push(LIST_LIMIT)

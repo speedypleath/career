@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Check, Mail, Radio, Save } from "lucide-react"
 import { ErrorBanner } from "./ErrorBanner"
 import { Skeleton } from "./Skeleton"
+import { WebhookView } from "./WebhookView"
+import { cx } from "./format"
 import { updateEmailSettings } from "@/lib/api-client"
 import { useEmailSettings } from "@/hooks/useEmailSettings"
 import type { EmailSettings } from "@/types"
@@ -181,6 +183,7 @@ function SettingsForm({ settings, onSaved, onError }: SettingsFormProps) {
 
 export function SettingsView() {
   const { data: settings, loading, error, reload, setError } = useEmailSettings()
+  const [section, setSection] = useState<"general" | "webhook">("general")
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -193,15 +196,38 @@ export function SettingsView() {
         </p>
       </div>
 
-      {loading && !settings && <Skeleton className="h-64 w-full" />}
+      <div className="flex border-b border-[var(--color-line)]">
+        {(["general", "webhook"] as const).map((id) => (
+          <button
+            key={id}
+            onClick={() => setSection(id)}
+            className={cx(
+              "px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
+              section === id
+                ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-fg)]",
+            )}
+          >
+            {id === "general" ? "General" : "Webhook & Cron"}
+          </button>
+        ))}
+      </div>
 
-      {settings && (
-        <SettingsForm
-          key={settings.id}
-          settings={settings}
-          onSaved={() => void reload(true)}
-          onError={setError}
-        />
+      {section === "general" ? (
+        <>
+          {loading && !settings && <Skeleton className="h-64 w-full" />}
+
+          {settings && (
+            <SettingsForm
+              key={settings.id}
+              settings={settings}
+              onSaved={() => void reload(true)}
+              onError={setError}
+            />
+          )}
+        </>
+      ) : (
+        <WebhookView />
       )}
     </div>
   )

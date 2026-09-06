@@ -62,9 +62,6 @@ model email_logs {
   snippet                      String?          @default("")
   body                         String?          @default("")
   classification               String?          @default("unrelated")
-  received_at                  DateTime?        @default(now()) @db.Timestamptz(6)
-  created_at                   DateTime?        @default(now()) @db.Timestamptz(6)
-  manual_override              Boolean?         @default(false)
   classification_state         String           @default("resolved")
   classification_source        String           @default("legacy")
   classifier_prompt_hash       String?
@@ -72,6 +69,10 @@ model email_logs {
   classifier_completion_tokens Int?
   classification_error         String?
   classified_at                DateTime?        @db.Timestamptz(6)
+  manual_override              Boolean?         @default(false)
+  received_at                  DateTime?        @default(now()) @db.Timestamptz(6)
+  created_at                   DateTime?        @default(now()) @db.Timestamptz(6)
+  follow_up_done               Boolean          @default(false)
   applications                 applications?    @relation(fields: [application_id], references: [id], onUpdate: NoAction)
   email_summaries              email_summaries?
 
@@ -83,16 +84,16 @@ model email_logs {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model email_settings {
   id                 String    @id @default("default")
-  imap_host          String    @default("")
-  imap_port          Int       @default(993)
-  imap_user          String    @default("")
-  imap_password      String    @default("")
-  imap_tls           Boolean   @default(true)
-  gmail_account      String    @default("")
-  auto_sync          Boolean   @default(true)
-  sync_interval_mins Int       @default(60)
+  imap_host          String?   @default("")
+  imap_port          Int?      @default(993)
+  imap_user          String?   @default("")
+  imap_password      String?   @default("")
+  imap_tls           Boolean?  @default(true)
+  gmail_account      String?   @default("gheorgheandrei13@gmail.com")
+  auto_sync          Boolean?  @default(true)
+  sync_interval_mins Int?      @default(60)
   last_synced_at     DateTime? @db.Timestamptz(6)
-  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime? @default(now()) @db.Timestamptz(6)
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -116,5 +117,5 @@ model email_classification_cache {
   prompt_tokens     Int?
   completion_tokens Int?
   created_at        DateTime @default(now()) @db.Timestamptz(6)
-  expires_at        DateTime @default(dbgenerated("(now() + '30 days'::interval)")) @db.Timestamptz(6)
+  expires_at        DateTime @default(dbgenerated("(CURRENT_TIMESTAMP + '30 days'::interval)")) @db.Timestamptz(6)
 }
