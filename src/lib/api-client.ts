@@ -118,6 +118,7 @@ export async function getStats(): Promise<Stats> {
 export interface EmailQuery {
   classification?: string
   search?: string
+  excludeUnrelated?: boolean
 }
 
 export async function getEmailLogs(query: EmailQuery = {}): Promise<EmailLog[]> {
