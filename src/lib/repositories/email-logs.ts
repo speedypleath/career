@@ -3,9 +3,12 @@ import { prisma } from "../prisma"
 import type { EmailLog } from "@/types"
 import { buildLogUpdate } from "./email-logs-update.ts"
 import type { LogPatch } from "./email-logs-update.ts"
+import type { CustomFollowUpRow } from "./email-logs-followup.ts"
 
 export { buildLogUpdate, MANUAL_CLASSIFICATION_FIELDS } from "./email-logs-update.ts"
 export type { LogPatch } from "./email-logs-update.ts"
+export { buildCustomFollowUp } from "./email-logs-followup.ts"
+export type { CustomFollowUpInput, CustomFollowUpRow } from "./email-logs-followup.ts"
 
 const LIST_LIMIT = 100
 
@@ -171,6 +174,37 @@ export async function upsertScanned(email: ScannedEmail): Promise<EmailLog> {
       email.promptTokens,
       email.receivedAt,
       FOLLOW_UP_CLASSIFICATIONS,
+    ],
+  )
+  return res.rows[0]
+}
+
+/**
+ * Insert a row already validated by buildCustomFollowUp — no classifier, no
+ * queue, since the caller (a human via the UI, or an external tool hitting
+ * the endpoint directly) has already picked a classification and a link.
+ */
+export async function insertFollowUp(row: CustomFollowUpRow): Promise<EmailLog> {
+  const res = await query<EmailLog>(
+    `INSERT INTO email_logs (
+         id, application_id, message_id, sender, recipient, subject, snippet, body,
+         classification, classification_state, classification_source, manual_override
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+    [
+      row.id,
+      row.application_id,
+      row.message_id,
+      row.sender,
+      row.recipient,
+      row.subject,
+      row.snippet,
+      row.body,
+      row.classification,
+      row.classification_state,
+      row.classification_source,
+      row.manual_override,
     ],
   )
   return res.rows[0]
