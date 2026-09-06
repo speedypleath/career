@@ -8,6 +8,8 @@ on:
 
 env:
   NEXT_TELEMETRY_DISABLED: "1"
+  # swagger-ui-dist pulls @scarf/scarf, which phones home on install unless told not to.
+  SCARF_ANALYTICS: "false"
   # prisma.config.ts evaluates env("DATABASE_URL") during `prisma generate`
   # (postinstall). CI never connects — a syntactically valid placeholder is enough.
   DATABASE_URL: "postgresql://user:pass@localhost:5432/career"
@@ -25,18 +27,38 @@ jobs:
       group: ${{ github.workflow }}-verify-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run lint:openapi   # docs/openapi.yaml — served at /api/docs
       - run: npm run build
       - run: npm test
 
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-security-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Dependency vulnerabilities. The gate fails on any HIGH/CRITICAL advisory
+      # that is not explicitly allow-listed in audit-ci.jsonc — the known ones
+      # there all live in the Prisma 7 CLI dependency tree (mysql2, deepmerge-ts)
+      # and are unreachable from this Postgres-only app.
+      - run: npx audit-ci --config audit-ci.jsonc
+
   supabase:
-    needs: verify
+    needs: [verify, security]
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -52,9 +74,9 @@ jobs:
       group: ${{ github.workflow }}-supabase-migrate
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
         with:
           version: "2.33.9"   # pin; bump deliberately alongside supabase/.temp/cli-latest
 
@@ -79,7 +101,7 @@ jobs:
       # locally after every migration, which is exactly the kind of thing that
       # gets forgotten and 500s in production. Doing it here, against the
       # database `supabase db push` just migrated, removes the gap entirely.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -103,11 +125,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add prisma/schema.prisma
-          git commit -m "chore(prisma): sync schema.prisma with hosted schema
+          git commit -m "chore(prisma): sync schema.prisma with hosted schema [skip ci]
 
           Auto-committed by the supabase job in .github/workflows/deploy.yml
           after supabase db push, so the Prisma write path never runs
-          against a schema older than the migration that just landed."
+          against a schema older than the migration that just landed.
+          [skip ci] keeps this push from re-triggering the whole workflow."
           git push origin HEAD:main
 
       - name: Deploy the classifier worker
@@ -128,7 +151,7 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   deploy:
-    needs: [verify, supabase]
+    needs: [verify, security, supabase]
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -139,10 +162,10 @@ jobs:
       group: ${{ github.workflow }}-deploy-mini
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3.3.0
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
           # OAuth route instead: replace `authkey` with

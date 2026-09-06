@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Keep the pinned action SHAs in .github/workflows/*.yml current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+
+  # npm dependencies. Grouped so a routine week is one PR, not fifteen.
+  # Security advisories still open their own PRs immediately regardless.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+    groups:
+      prod:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev:
+        dependency-type: development
+        update-types: [minor, patch]

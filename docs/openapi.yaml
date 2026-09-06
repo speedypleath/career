@@ -1,0 +1,1346 @@
+openapi: 3.1.0
+info:
+  title: Career Job Application Tracker API
+  version: "1.0.0"
+  description: >-
+    HTTP API for the single-user job-application tracker. Every route handler is
+    wrapped by `handle()` (src/lib/api-response.ts): any thrown error becomes a
+    `500` with a JSON body of `{ "error": string }` carrying the error's own
+    message. Success bodies come from `ok()` and are plain JSON.
+
+
+    There is no authentication. The app is single-user and is not meant to be
+    exposed to the internet (see CLAUDE.md). Do not assume any authorization
+    layer.
+servers:
+  - url: http://127.0.0.1:8098
+    description: Local dev / self-hosted instance (Next.js, port 8098)
+
+tags:
+  - name: Applications
+    description: Job applications and their timeline
+  - name: Stats
+    description: Aggregate dashboard counts
+  - name: Email
+    description: Email logs, scanning, classification and IMAP settings
+  - name: Follow-ups
+    description: Manually created follow-up items
+  - name: Webhook
+    description: Unauthenticated intake for cron jobs / agents
+
+paths:
+  /api/applications:
+    get:
+      tags: [Applications]
+      summary: List applications
+      operationId: listApplications
+      description: >-
+        Returns every application (no pagination), each row enriched with
+        aggregate counts and the latest timeline event. The three detail arrays
+        (`events`, `emails`, `suggestedEmails`) are NOT included here.
+      parameters:
+        - name: status
+          in: query
+          description: >-
+            Exact match on `applications.status`. The literal `all` is treated as
+            "no filter". Any other unknown value simply matches nothing.
+          schema:
+            $ref: '#/components/schemas/ApplicationStatus'
+        - name: workplace
+          in: query
+          description: >-
+            Exact match on the `workplace_type` column (note the parameter name
+            differs from the column name). The literal `all` means "no filter".
+          schema:
+            $ref: '#/components/schemas/WorkplaceType'
+        - name: search
+          in: query
+          description: Case-insensitive `ILIKE %term%` across title, company, location and notes.
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: >-
+            Ordering. An unrecognized value silently falls back to `recent`, so
+            this parameter is never rejected.
+          schema:
+            type: string
+            enum: [recent, company, status, priority]
+            default: recent
+      responses:
+        '200':
+          description: The full list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [applications]
+                properties:
+                  applications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApplicationListItem'
+        '500':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Applications]
+      summary: Create an application
+      operationId: createApplication
+      description: >-
+        Creates an application and appends a `created` timeline event. Fields not
+        supplied fall back to server defaults (`workplace_type: remote`,
+        `status: applied`, `application_method: portal`, `priority: medium`,
+        `source: manual`, `applied_at: now`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewApplicationInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [application]
+                properties:
+                  application:
+                    $ref: '#/components/schemas/Application'
+        '400':
+          description: '`title` or `company` missing. Body: `{ "error": "Title and Company are required" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/applications/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationId'
+    get:
+      tags: [Applications]
+      summary: Get one application with its timeline, emails and suggested emails
+      operationId: getApplication
+      responses:
+        '200':
+          description: >-
+            The application, with `events`, `emails` and `suggestedEmails`
+            always present (`suggestedEmails` are unlinked email logs whose body
+            mentions the company).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [application]
+                properties:
+                  application:
+                    $ref: '#/components/schemas/ApplicationDetail'
+        '404':
+          description: 'Body: `{ "error": "Application not found" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Applications]
+      summary: Update an application
+      operationId: updateApplication
+      description: >-
+        Only the whitelisted `UPDATABLE_FIELDS` are written; any other key in the
+        body (including `id`, `created_at`, the aggregate counts) is ignored. A
+        `status` change and a `note_entry` each append their own timeline event.
+        An empty or no-op patch still returns `200` with the unchanged row.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationPatchInput'
+      responses:
+        '200':
+          description: The updated (or unchanged) application.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [application]
+                properties:
+                  application:
+                    $ref: '#/components/schemas/Application'
+        '404':
+          description: 'Body: `{ "error": "Application not found" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [Applications]
+      summary: Delete an application
+      operationId: deleteApplication
+      description: >-
+        Unconditional delete. A non-existent `id` is NOT a 404 — the response is
+        still `200 { "success": true }`. Cascades to `application_events`; email
+        logs are unlinked (`application_id` set null).
+      responses:
+        '200':
+          description: Deleted (or the id did not exist).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+                  message:
+                    type: string
+                    const: Application deleted
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/stats:
+    get:
+      tags: [Stats]
+      summary: Dashboard aggregate counts
+      operationId: getStats
+      responses:
+        '200':
+          description: One pass of `COUNT(*) FILTER` tallies plus the 15 most recent timeline events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stats]
+                properties:
+                  stats:
+                    $ref: '#/components/schemas/Stats'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/email/logs:
+    get:
+      tags: [Email]
+      summary: List email logs
+      operationId: listEmailLogs
+      description: >-
+        Newest first, hard `LIMIT 100`. Each row is left-joined to its
+        application, adding `company` and `app_title`.
+      parameters:
+        - name: classification
+          in: query
+          description: >-
+            Exact match on `classification`. The literal `all` means "no
+            filter".
+          schema:
+            $ref: '#/components/schemas/EmailClassification'
+        - name: search
+          in: query
+          description: Case-insensitive `ILIKE %term%` across sender, subject, snippet and the joined company.
+          schema:
+            type: string
+        - name: excludeUnrelated
+          in: query
+          description: >-
+            Only the exact string `true` activates this; it excludes
+            `classification = 'unrelated'` rows. Ignored when `classification`
+            is itself `unrelated`.
+          schema:
+            type: boolean
+        - name: needsFollowUp
+          in: query
+          description: >-
+            Only the exact string `true` activates this; it restricts to
+            `classification IN (assessment, question, interview)` AND
+            `follow_up_done = false`.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Up to 100 email logs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [emails]
+                properties:
+                  emails:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmailLogJoined'
+        '500':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Email]
+      summary: Correct an email log (classification / link / follow-up flag)
+      operationId: updateEmailLog
+      description: >-
+        Setting `classification` marks the row `manual_override = true`, which
+        every other writer in the pipeline (rescans, reanalyze, the queue
+        worker) then refuses to overwrite.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailLogPatchInput'
+      responses:
+        '200':
+          description: >-
+            Either the updated row, or — when the patch asked for nothing
+            writable — `{ "message": "Nothing to update" }`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [email]
+                    properties:
+                      email:
+                        $ref: '#/components/schemas/EmailLog'
+                  - type: object
+                    required: [message]
+                    properties:
+                      message:
+                        type: string
+                        const: Nothing to update
+        '400':
+          description: '`id` missing. Body: `{ "error": "Email log ID is required" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/email/scan:
+    get:
+      tags: [Email]
+      summary: Run a Gmail scan
+      operationId: runEmailScan
+      description: >-
+        Shells out to the `gog` CLI, classifies and logs new mail. A response
+        with zero results AND a populated `errors[]` means the scan was
+        BLOCKED (gog missing or token expired), not that there was no new mail.
+      responses:
+        '200':
+          description: Scan finished.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    required: [success, message]
+                    properties:
+                      success:
+                        type: boolean
+                        const: true
+                      message:
+                        type: string
+                        description: Human-readable summary line.
+                  - $ref: '#/components/schemas/ScanResult'
+        '500':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Email]
+      summary: Ingest or test a single email message
+      operationId: ingestEmail
+      description: >-
+        Feeds one message through the same classifier the scanner uses. If the
+        classifier is uncertain (`source: fallback`) the row is written
+        `pending`, a model job is enqueued, and the response is `202`. Supplying
+        `classification` in the body skips the classifier entirely.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestEmailInput'
+      responses:
+        '200':
+          description: Classified deterministically and logged.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, email, matchedApplicationId]
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+                  email:
+                    $ref: '#/components/schemas/EmailLog'
+                  matchedApplicationId:
+                    type: [string, 'null']
+                    format: uuid
+        '202':
+          description: Ambiguous — written `pending` and queued for the model.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, queued, email, matchedApplicationId]
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+                  queued:
+                    type: boolean
+                    const: true
+                  email:
+                    $ref: '#/components/schemas/EmailLog'
+                  matchedApplicationId:
+                    type: [string, 'null']
+                    format: uuid
+        '400':
+          description: '`sender` or `subject` missing. Body: `{ "error": "Both ''sender'' and ''subject'' are required" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/email/reanalyze:
+    post:
+      tags: [Email]
+      summary: Re-run classification for one email or a whole application
+      operationId: reanalyzeEmail
+      description: >-
+        Send exactly one of `id` (single email) or `applicationId` (walk all of
+        an application's emails, newest first). Rows carrying a human
+        `manual_override` are skipped untouched. The two modes return different
+        shapes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  description: A single email log id.
+                applicationId:
+                  type: string
+                  format: uuid
+                  description: Reanalyze every email linked to this application.
+      responses:
+        '200':
+          description: >-
+            Single-email mode returns `{ success, queued, skipped, email }`.
+            Application mode returns
+            `{ success, reanalyzedCount, skippedCount, emails, application }`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [success, queued, skipped, email]
+                    properties:
+                      success:
+                        type: boolean
+                        const: true
+                      queued:
+                        type: boolean
+                        description: True when the email was re-queued for the model.
+                      skipped:
+                        type: boolean
+                        description: True when the row had a human classification and was left alone.
+                      email:
+                        $ref: '#/components/schemas/EmailLogJoined'
+                  - type: object
+                    required: [success, reanalyzedCount, skippedCount, emails, application]
+                    properties:
+                      success:
+                        type: boolean
+                        const: true
+                      reanalyzedCount:
+                        type: integer
+                      skippedCount:
+                        type: integer
+                      emails:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EmailLogJoined'
+                      application:
+                        oneOf:
+                          - $ref: '#/components/schemas/Application'
+                          - type: 'null'
+        '400':
+          description: 'Neither `id` nor `applicationId` supplied. Body: `{ "error": "Either email log ID or applicationId is required" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Single-email mode only, when the id is unknown. Body: `{ "error": "Email log not found" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/email/settings:
+    get:
+      tags: [Email]
+      summary: Get IMAP / sync settings
+      operationId: getEmailSettings
+      description: '`imap_password` is never returned — it is excluded from the query projection.'
+      responses:
+        '200':
+          description: The settings row (falls back to defaults if none is seeded).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/EmailSettings'
+        '500':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Email]
+      summary: Update IMAP / sync settings
+      operationId: updateEmailSettings
+      description: >-
+        Upsert — only keys present in the body are written. An empty-string
+        `imap_password` means "leave the stored value alone", not "clear it".
+        `imap_port` and `sync_interval_mins` accept a number or a numeric
+        string. There is no validation path, so this route never returns 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailSettingsPatchInput'
+      responses:
+        '200':
+          description: The updated settings (still without `imap_password`).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/EmailSettings'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/follow-ups:
+    post:
+      tags: [Follow-ups]
+      summary: Create a custom (non-email) follow-up
+      operationId: createFollowUp
+      description: >-
+        Inserts a synthetic `email_logs` row so the item appears on the
+        Follow-ups tab. The row is created `manual_override = true` so nothing
+        downstream can reclassify it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomFollowUpInput'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email]
+                properties:
+                  email:
+                    $ref: '#/components/schemas/EmailLog'
+        '400':
+          description: >-
+            Validation failure. Body is one of:
+            `{ "error": "'title' is required" }`,
+            `{ "error": "'link' is required" }`,
+            `{ "error": "'classification' must be one of assessment, question, interview" }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/webhook/application:
+    get:
+      tags: [Webhook]
+      summary: Describe the webhook (self-documenting)
+      operationId: getWebhookInfo
+      responses:
+        '200':
+          description: A static description document with a sample payload and curl example.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, description, endpoint, sample_payload, curl_example]
+                properties:
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  endpoint:
+                    type: string
+                  sample_payload:
+                    type: object
+                    additionalProperties: true
+                  curl_example:
+                    type: string
+        '500':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Webhook]
+      summary: Record a job application from a cron job or agent
+      operationId: postWebhookApplication
+      description: >-
+        Upsert keyed on `(company, title)` case-insensitively: a repeated
+        posting updates the existing application (`COALESCE`-style merge, empty
+        fields are ignored) rather than duplicating it. Most fields accept
+        several spellings — see each property description; unknown keys are
+        allowed and ignored for matching but recorded in the timeline metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookApplicationInput'
+      responses:
+        '200':
+          description: 'An existing application was updated (`action` is `"updated"`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResult'
+        '201':
+          description: 'A new application was created (`action` is `"created"`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResult'
+        '400':
+          description: '`title` or `company` missing. Body: `{ "error": "Both ''title'' and ''company'' are required in the payload" }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+components:
+  parameters:
+    ApplicationId:
+      name: id
+      in: path
+      required: true
+      description: Application UUID.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Error:
+      description: >-
+        Unhandled error. `handle()` turns any thrown error into this shape with
+        the error's own message.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+      additionalProperties: false
+
+    WorkplaceType:
+      type: string
+      enum: [remote, hybrid, on-site]
+
+    ApplicationStatus:
+      type: string
+      enum:
+        - wishlist
+        - applied
+        - interview_pending
+        - interviewing
+        - technical_assessment
+        - offer
+        - rejected
+        - archived
+
+    ApplicationMethod:
+      type: string
+      enum: [portal, email, linkedin, referral, recruiter, other]
+
+    PriorityLevel:
+      type: string
+      enum: [low, medium, high, top]
+
+    EmailClassification:
+      type: string
+      enum:
+        - confirmation
+        - interview
+        - assessment
+        - rejection
+        - question
+        - offer
+        - unrelated
+        - conference
+
+    ApplicationBase:
+      type: object
+      description: Fields shared by every application representation.
+      required:
+        - id
+        - title
+        - company
+        - workplace_type
+        - location
+        - status
+        - application_method
+        - url
+        - job_description
+        - info_provided
+        - cover_letter
+        - salary
+        - contact_email
+        - contact_name
+        - notes
+        - priority
+        - source
+        - applied_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        company:
+          type: string
+        workplace_type:
+          $ref: '#/components/schemas/WorkplaceType'
+        location:
+          type: string
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+        application_method:
+          $ref: '#/components/schemas/ApplicationMethod'
+        url:
+          type: string
+        job_description:
+          type: string
+        info_provided:
+          type: string
+        cover_letter:
+          type: string
+        salary:
+          type: string
+        contact_email:
+          type: string
+        contact_name:
+          type: string
+        notes:
+          type: string
+        priority:
+          $ref: '#/components/schemas/PriorityLevel'
+        source:
+          type: string
+        applied_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ApplicationListItem:
+      description: A row from `GET /api/applications` — base fields plus aggregates.
+      allOf:
+        - $ref: '#/components/schemas/ApplicationBase'
+        - type: object
+          properties:
+            events_count:
+              description: >-
+                Count of timeline events. Comes straight from SQL `COUNT(*)` via
+                node-postgres and is therefore serialized as a numeric STRING,
+                despite being typed `number` in the TS client.
+              type: [string, integer]
+            emails_count:
+              description: Count of linked email logs. Same string-vs-number caveat as `events_count`.
+              type: [string, integer]
+            latest_event_title:
+              type: [string, 'null']
+            latest_event_time:
+              type: [string, 'null']
+              format: date-time
+
+    Application:
+      description: >-
+        Generic application object as returned by create / update / webhook.
+        Shape matches `ApplicationBase`; aggregate counts and detail arrays may
+        be absent.
+      allOf:
+        - $ref: '#/components/schemas/ApplicationBase'
+
+    ApplicationDetail:
+      description: A single application with its full timeline and related emails.
+      allOf:
+        - $ref: '#/components/schemas/ApplicationBase'
+        - type: object
+          required: [events, emails, suggestedEmails]
+          properties:
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/ApplicationEvent'
+            emails:
+              type: array
+              items:
+                $ref: '#/components/schemas/EmailLog'
+            suggestedEmails:
+              type: array
+              description: Unlinked email logs whose body mentions the company.
+              items:
+                $ref: '#/components/schemas/EmailLog'
+
+    ApplicationEvent:
+      type: object
+      required: [id, application_id, event_type, title, description, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        application_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum:
+            - status_change
+            - email_received
+            - interview_scheduled
+            - note_added
+            - created
+            - updated
+            - webhook_created
+        title:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    EmailLog:
+      type: object
+      required:
+        - id
+        - application_id
+        - message_id
+        - sender
+        - recipient
+        - subject
+        - snippet
+        - body
+        - classification
+        - manual_override
+        - follow_up_done
+        - received_at
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        application_id:
+          type: [string, 'null']
+          format: uuid
+        message_id:
+          type: string
+        sender:
+          type: string
+        recipient:
+          type: string
+        subject:
+          type: string
+        snippet:
+          type: string
+        body:
+          type: string
+        classification:
+          $ref: '#/components/schemas/EmailClassification'
+        classification_state:
+          type: string
+          enum: [pending, resolved, failed]
+        classification_source:
+          type: string
+          enum: [gate, rule, queue, cloudflare, cache, fallback, manual, legacy]
+        classifier_prompt_hash:
+          type: [string, 'null']
+        classifier_prompt_tokens:
+          type: [integer, 'null']
+        classifier_completion_tokens:
+          type: [integer, 'null']
+        classification_error:
+          type: [string, 'null']
+        classified_at:
+          type: [string, 'null']
+          format: date-time
+        manual_override:
+          type: boolean
+          description: Set when a human corrects the classification; every other writer then leaves the row alone.
+        follow_up_done:
+          type: boolean
+          description: Persisted dismissal for the Follow-ups tab.
+        received_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    EmailLogJoined:
+      description: An email log left-joined to its application.
+      allOf:
+        - $ref: '#/components/schemas/EmailLog'
+        - type: object
+          properties:
+            company:
+              type: [string, 'null']
+              description: Joined `applications.company`.
+            app_title:
+              type: [string, 'null']
+              description: Joined `applications.title`.
+
+    EmailSettings:
+      type: object
+      description: IMAP / sync settings. `imap_password` is deliberately never included.
+      required:
+        - id
+        - imap_host
+        - imap_port
+        - imap_user
+        - imap_tls
+        - gmail_account
+        - auto_sync
+        - sync_interval_mins
+        - last_synced_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          examples: [default]
+        imap_host:
+          type: string
+        imap_port:
+          type: integer
+        imap_user:
+          type: string
+        imap_tls:
+          type: boolean
+        gmail_account:
+          type: string
+        auto_sync:
+          type: boolean
+        sync_interval_mins:
+          type: integer
+        last_synced_at:
+          type: [string, 'null']
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+
+    Stats:
+      type: object
+      required:
+        - total
+        - wishlist
+        - applied
+        - interviewPending
+        - interviewing
+        - techAssessment
+        - offers
+        - rejected
+        - archived
+        - remoteCount
+        - hybridCount
+        - onsiteCount
+        - portalCount
+        - emailCount
+        - linkedinCount
+        - otherMethodCount
+        - recentEvents
+      properties:
+        total:
+          type: integer
+        wishlist:
+          type: integer
+        applied:
+          type: integer
+        interviewPending:
+          type: integer
+        interviewing:
+          type: integer
+        techAssessment:
+          type: integer
+        offers:
+          type: integer
+        rejected:
+          type: integer
+        archived:
+          type: integer
+        remoteCount:
+          type: integer
+        hybridCount:
+          type: integer
+        onsiteCount:
+          type: integer
+        portalCount:
+          type: integer
+        emailCount:
+          type: integer
+        linkedinCount:
+          type: integer
+        otherMethodCount:
+          type: integer
+        recentEvents:
+          type: array
+          description: The 15 most recent timeline events, each with the parent application's company and title.
+          items:
+            allOf:
+              - $ref: '#/components/schemas/ApplicationEvent'
+              - type: object
+                properties:
+                  company:
+                    type: string
+                  title_job:
+                    type: string
+
+    ScanResult:
+      type: object
+      required: [scannedCount, matchedCount, queuedCount, skippedCount, newEmails, errors]
+      properties:
+        scannedCount:
+          type: integer
+        matchedCount:
+          type: integer
+        queuedCount:
+          type: integer
+        skippedCount:
+          type: integer
+        newEmails:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailLog'
+        errors:
+          type: array
+          description: >-
+            `gog` failures surfaced as strings. Zero results plus a non-empty
+            `errors[]` means the scan was blocked, not that there was no mail.
+          items:
+            type: string
+        source:
+          type: string
+
+    NewApplicationInput:
+      type: object
+      required: [title, company]
+      description: >-
+        `title` and `company` are required; everything else has a server
+        default. Extra keys are ignored.
+      properties:
+        title:
+          type: string
+        company:
+          type: string
+        workplace_type:
+          type: string
+          default: remote
+        location:
+          type: string
+        status:
+          type: string
+          default: applied
+        application_method:
+          type: string
+          default: portal
+        url:
+          type: string
+        job_description:
+          type: string
+        info_provided:
+          type: string
+        cover_letter:
+          type: string
+        salary:
+          type: string
+        contact_email:
+          type: string
+        contact_name:
+          type: string
+        notes:
+          type: string
+        priority:
+          type: string
+          default: medium
+        source:
+          type: string
+          default: manual
+        applied_at:
+          type: string
+          format: date-time
+
+    ApplicationPatchInput:
+      type: object
+      description: >-
+        Any subset of the updatable fields. Keys outside this list (e.g. `id`,
+        `created_at`, `events_count`) are silently dropped. `note_entry` is not
+        a column — it asks the server to append a `note_added` timeline event.
+      properties:
+        title:
+          type: string
+        company:
+          type: string
+        workplace_type:
+          $ref: '#/components/schemas/WorkplaceType'
+        location:
+          type: string
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+        application_method:
+          $ref: '#/components/schemas/ApplicationMethod'
+        url:
+          type: string
+        job_description:
+          type: string
+        info_provided:
+          type: string
+        cover_letter:
+          type: string
+        salary:
+          type: string
+        contact_email:
+          type: string
+        contact_name:
+          type: string
+        notes:
+          type: string
+        priority:
+          $ref: '#/components/schemas/PriorityLevel'
+        source:
+          type: string
+        applied_at:
+          type: string
+          format: date-time
+        note_entry:
+          type: string
+          description: Not persisted as a column; appends a `note_added` timeline event.
+      additionalProperties: true
+
+    EmailLogPatchInput:
+      type: object
+      required: [id]
+      description: >-
+        `id` plus at least one of the writable fields. Supplying `classification`
+        also sets `manual_override = true` and stamps `classified_at`.
+      properties:
+        id:
+          type: string
+          format: uuid
+        application_id:
+          type: [string, 'null']
+          format: uuid
+          description: Link or unlink (null) the email.
+        classification:
+          $ref: '#/components/schemas/EmailClassification'
+        follow_up_done:
+          type: boolean
+      additionalProperties: false
+
+    IngestEmailInput:
+      type: object
+      required: [sender, subject]
+      description: One raw message to classify and log.
+      properties:
+        sender:
+          type: string
+        subject:
+          type: string
+        recipient:
+          type: string
+          description: Defaults to the owner's address.
+        body:
+          type: string
+        snippet:
+          type: string
+        application_id:
+          type: string
+          format: uuid
+          description: Force the link to this application even if nothing matches.
+        classification:
+          allOf:
+            - $ref: '#/components/schemas/EmailClassification'
+          description: If present, the classifier is skipped and this label is used verbatim.
+        message_id:
+          type: string
+          description: Defaults to a generated `manual-*` id.
+        received_at:
+          type: string
+          format: date-time
+          description: Defaults to now.
+      additionalProperties: false
+
+    CustomFollowUpInput:
+      type: object
+      required: [title, link]
+      properties:
+        title:
+          type: string
+        link:
+          type: string
+          description: A URL; its hostname becomes the row's `sender`.
+        company:
+          type: string
+          description: Appended to the subject as `title — company` when present.
+        notes:
+          type: string
+        classification:
+          type: string
+          enum: [assessment, question, interview]
+          default: question
+        application_id:
+          type: [string, 'null']
+          format: uuid
+      additionalProperties: false
+
+    EmailSettingsPatchInput:
+      type: object
+      description: Any subset of these keys. Missing keys are left unchanged.
+      properties:
+        imap_host:
+          type: string
+        imap_port:
+          type: [integer, string]
+        imap_user:
+          type: string
+        imap_password:
+          type: string
+          description: Empty string means "keep the stored password", not "clear it".
+        imap_tls:
+          type: boolean
+        gmail_account:
+          type: string
+        auto_sync:
+          type: boolean
+        sync_interval_mins:
+          type: [integer, string]
+      additionalProperties: false
+
+    WebhookApplicationInput:
+      type: object
+      required: [title, company]
+      description: >-
+        Payload for cron jobs / agents. Each field accepts several spellings;
+        the first alias carrying a non-empty value wins. Unknown keys are
+        allowed. On create, missing `workplace_type` / `status` /
+        `application_method` / `priority` get defaults; on update, empty fields
+        are left as they were.
+      properties:
+        title:
+          type: string
+          description: 'Aliases: `title`, `jobTitle`, `position`.'
+        company:
+          type: string
+          description: 'Aliases: `company`, `companyName`.'
+        workplace_type:
+          type: string
+          description: 'Aliases: `workplace_type`, `workplaceType`, `workplace`. Lowercased. Create default `remote`.'
+        status:
+          type: string
+          description: Lowercased. Create default `applied`.
+        application_method:
+          type: string
+          description: 'Aliases: `application_method`, `applicationMethod`, `method`. Lowercased. Create default `portal`.'
+        priority:
+          type: string
+          description: Lowercased. Create default `medium`.
+        location:
+          type: string
+          description: 'Aliases: `location`, `city`.'
+        url:
+          type: string
+          description: 'Aliases: `url`, `jobUrl`, `link`.'
+        job_description:
+          type: string
+          description: 'Aliases: `job_description`, `jobDescription`, `description`.'
+        info_provided:
+          type: string
+          description: 'Aliases: `info_provided`, `infoProvided`, `providedInfo`.'
+        cover_letter:
+          type: string
+          description: 'Aliases: `cover_letter`, `coverLetter`, `letter`.'
+        salary:
+          type: string
+          description: 'Aliases: `salary`, `compensation`.'
+        contact_email:
+          type: string
+          description: 'Aliases: `contact_email`, `contactEmail`, `email`.'
+        contact_name:
+          type: string
+          description: 'Aliases: `contact_name`, `contactName`.'
+        notes:
+          type: string
+          description: 'Aliases: `notes`, `comment`.'
+        source:
+          type: string
+          description: Free-form origin tag. Defaults to `webhook`.
+        applied_at:
+          type: string
+          format: date-time
+          description: 'Aliases: `applied_at`, `appliedAt`. Defaults to now.'
+      additionalProperties: true
+
+    WebhookResult:
+      type: object
+      required: [success, action, id, application]
+      properties:
+        success:
+          type: boolean
+          const: true
+        action:
+          type: string
+          enum: [created, updated]
+        id:
+          type: string
+          format: uuid
+        application:
+          $ref: '#/components/schemas/Application'

@@ -1,0 +1,21 @@
+# Config for `npm run lint:openapi` (@redocly/cli).
+apis:
+  career-tracker@v1:
+    root: docs/openapi.yaml
+
+extends:
+  - recommended
+
+rules:
+  # Single-user app with no auth by design (see CLAUDE.md "No auth").
+  # There is no security scheme to declare.
+  security-defined: off
+  # Several GET endpoints genuinely have no 4xx path — only the shared 500.
+  operation-4xx-response: off
+  # Internal API, not distributed under a license.
+  info-license: off
+  # Every operation carries an operationId — keep that enforced.
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-summary: error
+  no-unresolved-refs: error
