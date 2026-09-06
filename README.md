@@ -1,13 +1,20 @@
 # Career
 
-A private job-application tracker with an **Email Radar** that reads Gmail, works
-out what each reply actually means, and moves applications through a pipeline
+A job-application tracker with an **Email Radar** that reads Gmail, works out
+what each reply actually means, and moves applications through a pipeline
 without manual data entry.
 
-Runs locally on port `8098`, backed by Postgres. Single user, no auth — it is not
-meant to be exposed publicly.
+Runs locally on port `8098`, backed by Postgres. Single user, no auth — it is
+built to run as one person's private instance, not a multi-tenant service, so
+it is not meant to be exposed publicly on the open internet.
+
+Every screenshot below is seeded demo data (fake companies, a `demo.user@example.com`
+inbox) — nothing here is a real application or a real inbox.
+
+![Overview dashboard](docs/images/overview.png)
 
 - [Stack](#stack)
+- [Screenshots](#screenshots)
 - [Running it](#running-it)
 - [Deploying](#deploying)
 - [Data model](#data-model)
@@ -24,10 +31,31 @@ meant to be exposed publicly.
 | Database | Postgres via `pg` |
 | Gmail access | the `gog` Google Workspace CLI, shelled out from the scanner |
 
-There is no ORM and no API-client layer: routes call `query()` from
-`src/lib/db.ts` directly, and the client fetches its own routes.
+There is no ORM and no API-client layer for reads: most routes call `query()`
+from `src/lib/db.ts` directly (Prisma covers the CRUD write side — see
+`src/lib/prisma.ts`), and the client fetches its own routes.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Applications list](docs/images/applications.png) | ![Pipeline board](docs/images/kanban.png) |
+| ![Email Radar inbox](docs/images/emails-list.png) | ![Settings](docs/images/settings.png) |
+
+The webhook tab, for logging applications submitted by an external script or cron job:
+
+![Webhook tab](docs/images/webhook.png)
 
 ## Running it
+
+This app has exactly one owner. That identity is not hardcoded — it comes from
+environment variables, so the same source can run as anyone's private instance:
+
+| Variable | Used for | Required? |
+| --- | --- | --- |
+| `OWNER_EMAIL` | `src/lib/owner.ts` fallback for the Gmail account, and the blacklist entry that keeps the classifier from mistaking your own sent mail for a lead (`src/lib/email/status.ts`) | No — falls back to `owner@example.com`, and `email_settings.gmail_account` wins over it anyway once set via the Settings tab |
+| `OWNER_NAME` | Same blacklist, and a guard in `src/lib/email/extract.ts` that stops your own name from being misparsed as a company | No — the guards just no-op when unset |
+| `NEXT_PUBLIC_TAILSCALE_URL` | A second copyable webhook URL shown in the Webhook tab when this instance is reachable over Tailscale (`src/components/WebhookView.tsx`) | No — the Tailscale card just stays hidden |
 
 Postgres connection comes from the standard `PG*` environment variables. Every
 one has a local-dev default, so an out-of-the-box local Postgres needs no config:
@@ -40,7 +68,15 @@ one has a local-dev default, so an out-of-the-box local Postgres needs no config
 | `PGPASSWORD` | `postgres` |
 | `PGDATABASE` | `career` |
 
-Set them in `.env.local` (git-ignored) for anything other than the defaults.
+Set them, along with the owner variables above, in `.env.local` (git-ignored)
+for anything other than the Postgres defaults — `.env.example` has the full
+list with explanations, including the Supabase/Cloudflare variables the
+deployed instance additionally needs (see [Deploying](#deploying)).
+
+**A word of caution on `DATABASE_URL`:** if it's set, `src/lib/prisma.ts` uses
+it and ignores every `PG*` variable above — it does not compose with them.
+Leave it unset for a plain local Postgres; set it only when pointing at a
+pooler (e.g. Supabase) that the `PG*` vars alone can't express.
 
 ```bash
 createdb career
