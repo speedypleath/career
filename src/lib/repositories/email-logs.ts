@@ -128,6 +128,11 @@ export interface ScannedEmail {
  * manual_override is set, so re-ingesting a message cannot undo a human's
  * correction. application_id is the exception — it is COALESCEd, so a link can
  * still be added, never removed.
+ *
+ * follow_up_done also resets on this path (manual_override still respected):
+ * a rescan that reclassifies a message into a follow-up-eligible type clears
+ * a stale "handled" flag from its previous classification, so it reappears in
+ * the Follow-ups tab instead of silently staying dismissed.
  */
 export async function upsertScanned(email: ScannedEmail): Promise<EmailLog> {
   const res = await query<EmailLog>(
@@ -143,7 +148,12 @@ export async function upsertScanned(email: ScannedEmail): Promise<EmailLog> {
          classification_state = CASE WHEN email_logs.manual_override THEN email_logs.classification_state ELSE $10 END,
          classification_source = CASE WHEN email_logs.manual_override THEN email_logs.classification_source ELSE $11 END,
          classifier_prompt_hash = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_hash ELSE $12 END,
-         classifier_prompt_tokens = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_tokens ELSE $13 END
+         classifier_prompt_tokens = CASE WHEN email_logs.manual_override THEN email_logs.classifier_prompt_tokens ELSE $13 END,
+         follow_up_done = CASE
+           WHEN email_logs.manual_override THEN email_logs.follow_up_done
+           WHEN $9 = ANY($15) AND email_logs.classification IS DISTINCT FROM $9 THEN false
+           ELSE email_logs.follow_up_done
+         END
        RETURNING *`,
     [
       email.id,
@@ -160,6 +170,7 @@ export async function upsertScanned(email: ScannedEmail): Promise<EmailLog> {
       email.promptHash,
       email.promptTokens,
       email.receivedAt,
+      FOLLOW_UP_CLASSIFICATIONS,
     ],
   )
   return res.rows[0]

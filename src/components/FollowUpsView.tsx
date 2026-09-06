@@ -21,6 +21,11 @@ interface FollowUpsViewProps {
   onSelectApplication: (id: string) => void
 }
 
+// Mirrors FOLLOW_UP_CLASSIFICATIONS in src/lib/repositories/email-logs.ts — kept
+// in step with it since that's the server-side gate this view's rows already
+// passed to get here.
+const FOLLOW_UP_CLASSIFICATIONS = ["assessment", "question", "interview"]
+
 /**
  * Assessments, questions and interview replies still waiting on a response —
  * a filtered lens on the same email_logs rows the Emails tab shows, not a
@@ -42,9 +47,18 @@ export function FollowUpsView({ followUps, onSelectApplication }: FollowUpsViewP
     setData((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
   }
 
+  // A reclassification that moves an email out of assessment/question/interview
+  // disqualifies it from this view immediately, rather than leaving it in place
+  // until the next poll rewrites the list out from under the user.
   async function handleChangeClassification(id: string, next: string) {
     try {
-      applyUpdate(await setEmailClassification(id, next))
+      const updated = await setEmailClassification(id, next)
+      if (FOLLOW_UP_CLASSIFICATIONS.includes(updated.classification)) {
+        applyUpdate(updated)
+      } else {
+        setData((prev) => prev.filter((item) => item.id !== id))
+        if (selectedId === id) setSelectedId(null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change the classification")
     }

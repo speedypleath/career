@@ -14,6 +14,7 @@ import {
   linkEmailToApplication,
   reanalyzeEmail,
   setEmailClassification,
+  setFollowUpDone,
 } from "@/lib/api-client"
 import { useAsync } from "@/hooks/useAsync"
 import { useEmailLogs } from "@/hooks/useEmailLogs"
@@ -57,6 +58,7 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
   const [showIngest, setShowIngest] = useState(false)
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
   const [linkingId, setLinkingId] = useState<string | null>(null)
+  const [followUpBusyId, setFollowUpBusyId] = useState<string | null>(null)
   // A reanalysis that declines to run is a success, not a failure, so it gets
   // its own neutral line rather than the red banner.
   const [notice, setNotice] = useState<string | null>(null)
@@ -94,6 +96,17 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
       setError(err instanceof Error ? err.message : "Could not change the linked application")
     } finally {
       setLinkingId(null)
+    }
+  }
+
+  async function handleToggleFollowUp(id: string, done: boolean) {
+    setFollowUpBusyId(id)
+    try {
+      applyUpdate(await setFollowUpDone(id, done))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update the follow-up flag")
+    } finally {
+      setFollowUpBusyId(null)
     }
   }
 
@@ -221,6 +234,8 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
               reanalyzing={reanalyzingId === selectedEmail.id}
               linking={linkingId === selectedEmail.id}
               onOpenApplication={onSelectApplication}
+              onToggleFollowUp={(done) => handleToggleFollowUp(selectedEmail.id, done)}
+              followUpBusy={followUpBusyId === selectedEmail.id}
             />
           )}
         </div>
@@ -253,6 +268,8 @@ export function EmailsView({ onScanEmails, isScanning, onSelectApplication }: Em
                   onSelectApplication(id)
                   setSelectedId(null)
                 }}
+                onToggleFollowUp={(done) => handleToggleFollowUp(selectedEmail.id, done)}
+                followUpBusy={followUpBusyId === selectedEmail.id}
                 bodyClassName="max-h-56"
               />
             </div>
