@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { Pool } from "pg"
 
-const PLIST = "/Users/youruser/Library/LaunchAgents/com.openclaw.career.plist"
+const PLIST = `${process.env.HOME}/Library/LaunchAgents/com.openclaw.career.plist`
 
 function readSourceConfig() {
   const raw = execFileSync("plutil", ["-convert", "json", "-o", "-", PLIST], {
@@ -22,7 +22,7 @@ function readSourceConfig() {
 const source = readSourceConfig()
 
 if (process.argv[2] === "backup") {
-  const backupDir = "/Users/youruser/Backups/career"
+  const backupDir = `${process.env.HOME}/Backups/career`
   mkdirSync(backupDir, { recursive: true, mode: 0o700 })
   const stamp = new Date().toISOString().replaceAll(":", "-").replace(".000Z", "Z")
   const backupPath = join(backupDir, `career-${stamp}.dump`)

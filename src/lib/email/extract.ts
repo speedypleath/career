@@ -9,6 +9,15 @@ const ownerNamePattern = OWNER_NAME.trim()
   ? new RegExp(OWNER_NAME.trim().split(/\s+/).join("|"), "i")
   : null
 
+// Same guard, reshaped as a regex alternation fragment so it can be spliced
+// into the "applying to <Company>" terminator below (that pattern already
+// stops at "team"/"hiring" - the owner's own first/last name is the same
+// kind of false-positive terminator, e.g. "applying to Acme alex" should
+// not capture "Acme alex" as the company).
+const ownerNameTerminator = OWNER_NAME.trim()
+  ? `|\\s+(?:${OWNER_NAME.trim().split(/\s+/).join("|")})`
+  : ""
+
 export function isAtsSender(sender: string): boolean {
   const lower = (sender || "").toLowerCase()
   return CLASSIFIER_ATS_DOMAINS.some((domain) => lower.includes(domain)) || lower.includes("linkedin.com")
@@ -63,7 +72,10 @@ export function extractCompanyName(subject: string, sender: string, body: string
   }
 
   // 4. "Thank you for applying to <Company>" / "Thanks for applying to <Company>"
-  m = subject.match(/(?:applying to join|applying to|application to|interest in joining|interest in|application with)\s+([A-Za-z0-9\s._&-]+?)(?:!|\.|\(|$|\s+team|\s+hiring|\s+owner)/i)
+  m = subject.match(new RegExp(
+    `(?:applying to join|applying to|application to|interest in joining|interest in|application with)\\s+([A-Za-z0-9\\s._&-]+?)(?:!|\\.|\\(|$|\\s+team|\\s+hiring${ownerNameTerminator})`,
+    "i",
+  ))
   if (m && m[1].trim().length > 1) {
     const s = sanitizeCompany(m[1])
     if (s !== "Unknown Company") return s

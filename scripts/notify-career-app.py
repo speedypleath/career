@@ -22,7 +22,7 @@ def post_application(data):
         "url": data.get("url", ""),
         "location": data.get("location", ""),
         "job_description": data.get("job_description", ""),
-        "info_provided": data.get("info_provided", "CV: example-cv.pdf"),
+        "info_provided": data.get("info_provided", "CV: resume.pdf"),
         "cover_letter": data.get("cover_letter", ""),
         "salary": data.get("salary", ""),
         "contact_email": data.get("contact_email", ""),
@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--url", default="", help="Job listing or ATS URL")
     parser.add_argument("--location", default="", help="Job location")
     parser.add_argument("--salary", default="", help="Salary / compensation range")
-    parser.add_argument("--info", default="CV: example-cv.pdf", help="Info provided / resume notes")
+    parser.add_argument("--info", default="CV: resume.pdf", help="Info provided / resume notes")
     parser.add_argument("--letter", default="", help="Cover letter text")
     parser.add_argument("--notes", default="", help="Additional notes")
     parser.add_argument("--priority", default="high", choices=["low", "medium", "high", "top"], help="Priority level")

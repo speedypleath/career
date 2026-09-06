@@ -1,4 +1,5 @@
 import { createPool } from './lib/db-config.ts'
+import { OWNER_EMAIL } from '../src/lib/owner.ts'
 
 const pool = createPool('supabase')
 
@@ -66,8 +67,8 @@ async function run() {
     await client.query(`
       UPDATE email_logs 
       SET classification = 'unrelated', application_id = NULL, classification_state = 'resolved', classification_source = 'gate'
-      WHERE sender ILIKE '%owner@example.com%'
-    `);
+      WHERE sender ILIKE $1
+    `, [`%${OWNER_EMAIL}%`]);
 
     console.log('Email logs successfully updated.');
 
