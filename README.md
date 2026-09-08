@@ -90,8 +90,8 @@ Production-ish, as it runs on the Mac mini:
 
 ```bash
 npm run build
-scripts/start.sh                    # nohup npm start, logs to logs/server.log
-scripts/stop.sh
+ops/local/start.sh                 # nohup npm start, logs to logs/server.log
+ops/local/stop.sh
 ```
 
 Gmail scanning additionally needs `gog` on `PATH` and an authorised account:
@@ -172,14 +172,27 @@ The full contract — every field, status code and deliberate quirk — lives in
 (also enforced in CI); a running instance serves Swagger UI at
 [`/api/docs`](http://localhost:8098/api/docs).
 
-## Scripts
+## CLI Commands
 
 | Script | What it does |
 | --- | --- |
-| `scripts/eval-classifier.ts` | Re-classifies every stored email and diffs against what is saved. Run before and after any classifier change. |
-| `scripts/debug-classify.ts` | Prints the full rule trace for one stored email. |
-| `scripts/backfill-html-bodies.ts` | One-off: flattens `email_logs.snippet` rows that were stored as raw HTML. |
-| `scripts/notify-career-app.py` | Webhook notifier used by cron. |
+| `npm run classifier:evaluate` | Re-classifies every stored email and diffs against what is saved. Add `-- --write` to apply changes. |
+| `npm run classifier:debug -- "subject fragment"` | Prints the full rule trace for one stored email. |
+| `npm run email:backfill-html -- --write` | Flattens email rows that were stored as raw HTML. Omit `--write` for a dry run. |
+| `npm run classifier:reclassify` | Reclassifies hosted Supabase emails and queues ambiguous rows. |
+| `npm run classifier:requeue` | Requeues failed hosted Supabase classifications. |
+| `integrations/notify-career-app.py` | External webhook notifier used by cron. |
 
-These are standalone Node scripts run directly (`node scripts/eval-classifier.ts`)
-and are excluded from the Next build's `tsconfig.json`.
+The maintained commands live under `src/cli` and are type-checked by the Next
+build. External integrations and machine orchestration remain outside the CLI.
+
+The hosted Supabase project is the source of truth. To refresh the local Prisma
+Dev and Supabase Local targets from hosted Supabase, load `.env` and run:
+
+```bash
+set -a; . ./.env; set +a
+npm run db:pull:targets
+```
+
+This is a one-way pull and replaces only the five application tables in the
+local targets. It is intentionally not a background watcher.

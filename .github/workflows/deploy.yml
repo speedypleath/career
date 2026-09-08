@@ -112,7 +112,7 @@ jobs:
       - name: Regenerate prisma/schema.prisma from the hosted database
         run: npx prisma db pull && npx prisma generate
         env:
-          # Same pooler shape as scripts/repoint-career-supabase.sh / .env.example
+          # Same pooler shape as ops/repoint-career-supabase.sh / .env.example
           # (direct db.<ref> host is IPv6-only from most runners; the pooler isn't).
           DATABASE_URL: "postgresql://postgres.${{ vars.SUPABASE_PROJECT_REF }}:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
 
@@ -180,7 +180,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$MINI_HOSTKEY" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
-            "$MINI_USER@$MINI_HOST" 'bash -s' < scripts/deploy-on-mini.sh
+            "$MINI_USER@$MINI_HOST" 'bash -s' < ops/deploy-on-mini.sh
         env:
           MINI_SSH_KEY: ${{ secrets.MINI_SSH_KEY }}
           MINI_HOSTKEY: ${{ secrets.MINI_SSH_HOSTKEY }}
