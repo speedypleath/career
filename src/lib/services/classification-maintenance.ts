@@ -3,7 +3,7 @@ import { classifyEmailDetailed } from "../email-classifier.ts"
 import { buildClassificationJob } from "../email-classification-queue.ts"
 import { deleteBogusApplications } from "./bogus-applications.ts"
 
-export type MaintenanceQuery = (text: string, params?: unknown[]) => Promise<{ rows: QueryResultRow[] }>
+export type MaintenanceQuery = <T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>
 
 export interface ReclassificationSummary {
   fetched: number
@@ -15,7 +15,15 @@ export interface ReclassificationSummary {
 }
 
 export async function reclassifyStoredEmails(query: MaintenanceQuery): Promise<ReclassificationSummary> {
-  const { rows: emails } = await query(`
+  const { rows: emails } = await query<{
+    id: string
+    sender: string
+    subject: string
+    body: string | null
+    snippet: string | null
+    application_id: string | null
+    manual_override: boolean
+  }>(`
     SELECT id, sender, subject, body, snippet, application_id, manual_override
     FROM email_logs ORDER BY created_at ASC
   `)
@@ -92,7 +100,7 @@ export async function reclassifyStoredEmails(query: MaintenanceQuery): Promise<R
   }
 
   const bogus = await deleteBogusApplications(query)
-  const { rows: counts } = await query(
+  const { rows: counts } = await query<{ classification: string; count: number }>(
     `SELECT classification, count(*)::int AS count
      FROM email_logs GROUP BY classification ORDER BY count DESC`,
   )

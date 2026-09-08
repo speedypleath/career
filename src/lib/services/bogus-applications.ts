@@ -26,7 +26,7 @@ export const BOGUS_APPLICATION_COMPANY_NAMES = new Set([
 
 export const BOGUS_APPLICATION_TITLE_NAMES = new Set(["", "unknown role", "unknown company"])
 
-export type MaintenanceQuery = (text: string, params?: unknown[]) => Promise<{ rows: QueryResultRow[] }>
+export type MaintenanceQuery = <T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>
 
 export interface BogusApplication {
   id: string
@@ -35,7 +35,7 @@ export interface BogusApplication {
 }
 
 export async function findBogusApplications(query: MaintenanceQuery): Promise<BogusApplication[]> {
-  const { rows } = await query(
+  const { rows } = await query<BogusApplication>(
     `SELECT id, company, title FROM applications
      WHERE lower(coalesce(company,'')) = ANY($1::text[])
         OR lower(coalesce(title,'')) = ANY($2::text[])`,
