@@ -1,8 +1,9 @@
+import type { QueryResultRow } from "pg"
 import { classifyEmailDetailed } from "../email-classifier.ts"
 import { buildClassificationJob } from "../email-classification-queue.ts"
 import { deleteBogusApplications } from "./bogus-applications.ts"
 
-export type MaintenanceQuery = (text: string, params?: unknown[]) => Promise<{ rows: any[] }>
+export type MaintenanceQuery = (text: string, params?: unknown[]) => Promise<{ rows: QueryResultRow[] }>
 
 export interface ReclassificationSummary {
   fetched: number

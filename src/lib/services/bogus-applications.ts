@@ -1,3 +1,5 @@
+import type { QueryResultRow } from "pg"
+
 export const BOGUS_APPLICATION_COMPANY_NAMES = new Set([
   "",
   "unknown",
@@ -24,7 +26,7 @@ export const BOGUS_APPLICATION_COMPANY_NAMES = new Set([
 
 export const BOGUS_APPLICATION_TITLE_NAMES = new Set(["", "unknown role", "unknown company"])
 
-export type MaintenanceQuery = (text: string, params?: unknown[]) => Promise<{ rows: any[] }>
+export type MaintenanceQuery = (text: string, params?: unknown[]) => Promise<{ rows: QueryResultRow[] }>
 
 export interface BogusApplication {
   id: string
