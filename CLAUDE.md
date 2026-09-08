@@ -15,15 +15,15 @@ npm run test:classifier      # node --test, classifier suite only
 # one test: npm test -- -t "noise exits"
 # or:       node --test --experimental-strip-types --test-name-pattern "noise exits" tests/email-classifier.test.ts
 
-scripts/start.sh             # nohup npm start -> logs/server.log; refuses if 8098 is busy
-scripts/stop.sh
+ops/local/start.sh          # nohup npm start -> logs/server.log; refuses if 8098 is busy
+ops/local/stop.sh
 ```
 
 `npm run test:classifier` + `npm run build` is the verification pair for any
 classifier change. `npm run build` is also the only type-check gate — `tsconfig`
-sets `noEmit`, so nothing else runs `tsc`. Additionally, `node scripts/eval-classifier.ts` re-classifies
+sets `noEmit`, so nothing else runs `tsc`. Additionally, `npm run classifier:evaluate` re-classifies
 every stored email and diffs against what is saved — run it before and after
-touching classification rules; `node scripts/debug-classify.ts "<subject fragment>"`
+touching classification rules; `npm run classifier:debug -- "<subject fragment>"`
 prints the rule trace for up to 3 matching stored emails.
 
 Scripts read `PG*` / `DATABASE_URL` straight off the environment, and `.env`
@@ -32,7 +32,7 @@ So the shell has to source it first — this is also why every `.vscode/launch.j
 config is `node-terminal` rather than using `envFile`:
 
 ```bash
-set -a; . ./.env; set +a; node scripts/eval-classifier.ts
+set -a; . ./.env; set +a; npm run classifier:evaluate
 ```
 
 **What that gate does not cover:** it re-runs `classifyEmailDetailed` over stored
@@ -43,13 +43,12 @@ SQL templates before and after as well.
 ## Deployment shape
 
 The app runs on a Mac mini as launchd job `com.openclaw.career`, pointed at a
-hosted Supabase Postgres (`scripts/repoint-career-supabase.sh` rewrites the
-plist's `PG*` env). So there are two Postgres targets: a plain local `career`
-database, and Supabase. Scripts differ in which they default to — `eval-classifier`,
-`debug-classify`, `backfill-html-bodies`, `postgres-migration-inventory` default to
-localhost; `reclassify-all`, `requeue-failed-emails` and `clean-bogus-apps` default
-to the Supabase pooler (`aws-1-eu-west-1.pooler.supabase.com`). Check the top of a
-script before running it. Connecting to Supabase also needs `PGSSLMODE=require` —
+hosted Supabase Postgres (`ops/repoint-career-supabase.sh` rewrites the
+plist's `PG*` env). Hosted Supabase is the source of truth; `career-local` is a
+development copy, and Prisma Dev/Supabase Local are disposable pull targets.
+Maintenance commands use explicit `career-local` or `hosted-supabase` profiles;
+they do not infer a target from inherited `PG*` values. Connecting to Supabase
+also needs `PGSSLMODE=require` —
 `src/lib/db.ts` only enables TLS when that is set.
 
 Supabase-side deploy:

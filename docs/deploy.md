@@ -12,7 +12,7 @@ One workflow, `.github/workflows/deploy.yml`, with three jobs:
 |---|---|---|
 | `verify` | every PR, every `main` push, `workflow_dispatch` | `npm ci` → `npm run lint` → `npm run build` (the only type-check gate — `tsconfig` has `noEmit`) → `npm test`. |
 | `supabase` | `main` push / dispatch only, after `verify` | `supabase link` → `supabase db push` → `supabase functions deploy email-classifier-worker` → `supabase secrets set` for the two Cloudflare vars. |
-| `deploy` | `main` push / dispatch only, after `verify` **and** `supabase` | Joins the tailnet with `tailscale/github-action`, SSHes to the mini, pipes `scripts/deploy-on-mini.sh` to `bash -s`. That script resets to `origin/main`, sources `.env`, `npm ci`, `npm run build`, restarts the launchd job, and blocks on a local HTTP health probe. |
+| `deploy` | `main` push / dispatch only, after `verify` **and** `supabase` | Joins the tailnet with `tailscale/github-action`, SSHes to the mini, pipes `ops/deploy-on-mini.sh` to `bash -s`. That script resets to `origin/main`, sources `.env`, `npm ci`, `npm run build`, restarts the launchd job, and blocks on a local HTTP health probe. |
 
 **Ordering rationale:** `supabase` runs before `deploy` so the database schema and
 the edge function are always at or ahead of the app code that expects them. PRs
@@ -41,9 +41,9 @@ call Workers AI (`@cf/meta/llama-3.2-1b-instruct`). The `supabase` job's
 - **The `gog` Google Workspace CLI auth on the mini** — the email scanner shells
   out to it. Re-authenticate on the mini directly when it lapses.
 - **The launchd plist's `PG*` env** (`~/Library/LaunchAgents/com.openclaw.career.plist`)
-  — owned by `scripts/repoint-career-supabase.sh`, not this pipeline. The plist,
+  — owned by `ops/repoint-career-supabase.sh`, not this pipeline. The plist,
   not `.env`, is what the running service reads for its database connection.
-  `scripts/deploy-on-mini.sh` sources `.env` only for *build-time* env
+  `ops/deploy-on-mini.sh` sources `.env` only for *build-time* env
   (`prisma generate`, `next build`).
 
 ## One-time setup

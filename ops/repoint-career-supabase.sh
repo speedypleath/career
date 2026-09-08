@@ -1,13 +1,11 @@
 #!/bin/bash
-# Point the career launchd service at Supabase and restart it.
-# Usage: SUPABASE_PROJECT_REF=xxxx SUPABASE_DB_PASSWORD='...' bash scripts/repoint-career-supabase.sh
+# Point the career launchd service at hosted Supabase and restart it.
 set -euo pipefail
 
 PLIST="$HOME/Library/LaunchAgents/com.openclaw.career.plist"
 LABEL="com.openclaw.career"
-
-# Read deployment config from openclaw.json (values never printed).
 CONFIG_JSON="$HOME/.openclaw/openclaw.json"
+
 read_from_config() {
   node -e '
     const c = require(process.argv[1]);
@@ -19,10 +17,14 @@ read_from_config() {
     }
   ' "$CONFIG_JSON" "$1"
 }
+
 PW="$(read_from_config pw)"
 REF="$(read_from_config ref)"
-if [ -z "${REF}" ] || [ -z "${PW}" ]; then echo "Could not read SUPABASE ref/password from openclaw.json" >&2; exit 1; fi
-# Reachable IPv4 endpoint (direct db.<ref> host is IPv6-only from this Mac).
+if [ -z "${REF}" ] || [ -z "${PW}" ]; then
+  echo "Could not read Supabase ref/password from openclaw.json" >&2
+  exit 1
+fi
+
 HOST="aws-1-eu-west-1.pooler.supabase.com"
 PGUSER="postgres.${REF}"
 

@@ -27,10 +27,10 @@
       }
     },
             {
-      // scripts/*.ts read PG* straight off process.env and fall back to
-      // localhost, so the shell has to source .env first. VS Code's own
-      // "envFile" cannot do it: .env uses `export` prefixes and ${VAR}
-      // interpolation, and the envFile parser understands neither.
+          // CLI commands read named database profiles and still need .env for
+          // hosted Supabase credentials. VS Code's own "envFile" cannot do it:
+      // .env uses `export` prefixes and ${VAR} interpolation, and the envFile
+      // parser understands neither.
       "name": "Script: current file (with .env)",
       "type": "node-terminal",
       "request": "launch",
@@ -42,7 +42,7 @@
       "name": "Script: eval-classifier (with .env)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "set -a; . ./.env; set +a; node scripts/eval-classifier.ts",
+      "command": "set -a; . ./.env; set +a; npm run classifier:evaluate",
       "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"]
     }

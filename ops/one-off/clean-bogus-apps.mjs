@@ -1,7 +1,7 @@
-import { createPool } from './lib/db-config.ts'
-import { OWNER_EMAIL } from '../src/lib/owner.ts'
+import { createPool } from '../../src/lib/db/client.ts'
+import { OWNER_EMAIL } from '../../src/lib/owner.ts'
 
-const pool = createPool('supabase')
+const pool = createPool('hosted-supabase')
 
 async function run() {
   const client = await pool.connect();

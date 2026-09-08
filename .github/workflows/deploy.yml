@@ -28,10 +28,9 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@v4.4.0 # v4.4.0
         with:
           node-version-file: .nvmrc
-          cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run lint:openapi   # docs/openapi.yaml — served at /api/docs
@@ -46,10 +45,9 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@v4.4.0 # v4.4.0
         with:
           node-version-file: .nvmrc
-          cache: npm
       - run: npm ci
       # Dependency vulnerabilities. The gate fails on any HIGH/CRITICAL advisory
       # that is not explicitly allow-listed in audit-ci.jsonc — the known ones
@@ -101,10 +99,9 @@ jobs:
       # locally after every migration, which is exactly the kind of thing that
       # gets forgotten and 500s in production. Doing it here, against the
       # database `supabase db push` just migrated, removes the gap entirely.
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@v4.4.0 # v4.4.0
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Install dependencies (for the Prisma CLI)
         run: npm ci
@@ -112,7 +109,7 @@ jobs:
       - name: Regenerate prisma/schema.prisma from the hosted database
         run: npx prisma db pull && npx prisma generate
         env:
-          # Same pooler shape as scripts/repoint-career-supabase.sh / .env.example
+          # Same pooler shape as ops/repoint-career-supabase.sh / .env.example
           # (direct db.<ref> host is IPv6-only from most runners; the pooler isn't).
           DATABASE_URL: "postgresql://postgres.${{ vars.SUPABASE_PROJECT_REF }}:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
 
@@ -180,7 +177,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$MINI_HOSTKEY" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
-            "$MINI_USER@$MINI_HOST" 'bash -s' < scripts/deploy-on-mini.sh
+            "$MINI_USER@$MINI_HOST" 'bash -s' < ops/deploy-on-mini.sh
         env:
           MINI_SSH_KEY: ${{ secrets.MINI_SSH_KEY }}
           MINI_HOSTKEY: ${{ secrets.MINI_SSH_HOSTKEY }}
