@@ -31,7 +31,6 @@ jobs:
       - uses: actions/setup-node@v4.4.0 # v4.4.0
         with:
           node-version-file: .nvmrc
-          cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run lint:openapi   # docs/openapi.yaml — served at /api/docs
@@ -49,7 +48,6 @@ jobs:
       - uses: actions/setup-node@v4.4.0 # v4.4.0
         with:
           node-version-file: .nvmrc
-          cache: npm
       - run: npm ci
       # Dependency vulnerabilities. The gate fails on any HIGH/CRITICAL advisory
       # that is not explicitly allow-listed in audit-ci.jsonc — the known ones
@@ -104,7 +102,6 @@ jobs:
       - uses: actions/setup-node@v4.4.0 # v4.4.0
         with:
           node-version-file: .nvmrc
-          cache: npm
 
       - name: Install dependencies (for the Prisma CLI)
         run: npm ci
