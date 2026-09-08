@@ -28,7 +28,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@v4.4.0 # v4.4.0
+      - uses: actions/setup-node@v7.0.0 # v4.4.0
         with:
           node-version-file: .nvmrc
       - run: npm ci
@@ -45,7 +45,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@v4.4.0 # v4.4.0
+      - uses: actions/setup-node@v7.0.0 # v4.4.0
         with:
           node-version-file: .nvmrc
       - run: npm ci
@@ -99,7 +99,7 @@ jobs:
       # locally after every migration, which is exactly the kind of thing that
       # gets forgotten and 500s in production. Doing it here, against the
       # database `supabase db push` just migrated, removes the gap entirely.
-      - uses: actions/setup-node@v4.4.0 # v4.4.0
+      - uses: actions/setup-node@v7.0.0 # v4.4.0
         with:
           node-version-file: .nvmrc
 
